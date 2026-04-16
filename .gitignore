@@ -20,3 +20,7 @@ uploads/
 
 *.log
 
+apps/web/AGENTS.md
+apps/web/CLAUDE.md
+apps/web/README.md
+
