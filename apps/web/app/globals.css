@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+:root {
+  --color-paper: #f6f1e8;
+  --color-surface: #f0e8dc;
+  --color-border: rgba(34, 24, 18, 0.12);
+  --color-ink: #1f1812;
+  --color-muted: #67594f;
+  --color-accent: #e2aa5e;
+  --color-accent-ink: #382412;
+  --background: var(--color-paper);
+  --foreground: var(--color-ink);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-manrope);
+  --font-display: var(--font-fraunces);
+  --font-mono: var(--font-plex-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background:
+    radial-gradient(circle at top left, rgba(201, 122, 58, 0.18), transparent 30%),
+    radial-gradient(circle at 85% 10%, rgba(25, 77, 63, 0.12), transparent 28%),
+    var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-manrope), sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.studio-grid {
+  background-image:
+    linear-gradient(rgba(31, 24, 18, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(31, 24, 18, 0.045) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(circle at center, black 45%, transparent 100%);
+}
+
+.studio-noise {
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(31, 24, 18, 0.12) 1px, transparent 0);
+  background-size: 20px 20px;
+}
+
+::selection {
+  background: rgba(226, 170, 94, 0.45);
+}
