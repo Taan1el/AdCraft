@@ -17,6 +17,10 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # GitHub Actions often sets NODE_ENV=production globally, which makes `npm ci`
+      # skip devDependencies. Next.js + Tailwind v4 need dev-time packages during `next build`.
+      NODE_ENV: development
     steps:
       - name: Checkout
         uses: actions/checkout@v4
