@@ -1,0 +1,17 @@
+node_modules/
+dist/
+build/
+.next/
+.venv/
+.env*
+!.env.example
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+*.pyc
+*.pyo
+*.pyd
+coverage/
+apps/web/node_modules/
+apps/web/.next/
+*.log
