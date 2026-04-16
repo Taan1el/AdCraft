@@ -17,10 +17,6 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      # GitHub Actions often sets NODE_ENV=production globally, which makes `npm ci`
-      # skip devDependencies. Next.js + Tailwind v4 need dev-time packages during `next build`.
-      NODE_ENV: development
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,7 +30,9 @@ jobs:
 
       - name: Install (web)
         working-directory: apps/web
-        run: npm ci
+        # Some CI environments set NODE_ENV=production, which can omit devDependencies during `npm ci`.
+        # Tailwind v4 pulls in lightningcss native bindings via dev-time packages, so keep dev deps.
+        run: npm ci --include=dev
 
       - name: Build static export
         working-directory: apps/web
