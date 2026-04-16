@@ -26,22 +26,20 @@ jobs:
         with:
           node-version: "20"
           cache: npm
-          cache-dependency-path: apps/web/package-lock.json
+          cache-dependency-path: package-lock.json
 
-      - name: Install (web)
-        working-directory: apps/web
+      - name: Install (workspaces)
         # Some CI environments set NODE_ENV=production, which can omit devDependencies during `npm ci`.
         # Tailwind v4 pulls in lightningcss native bindings via dev-time packages, so keep dev deps.
         run: npm ci --include=dev
 
       - name: Build static export
-        working-directory: apps/web
         env:
           # Project Pages URL is always /<repo>/...
           NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
           # Set this in GitHub repo Settings → Secrets and variables → Actions
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
-        run: npm run build
+        run: npm --workspace apps/web run build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
