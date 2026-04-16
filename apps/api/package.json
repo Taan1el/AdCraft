@@ -1,0 +1,10 @@
+{
+  "name": "@adcraft/api",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "python -m uvicorn app.main:app --reload --port 8010",
+    "test": "python -m pytest -q"
+  }
+}
+
