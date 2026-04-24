@@ -202,20 +202,17 @@ export function AdCraftStudio() {
 
       {/* Features */}
       <section style={{ padding: "80px 24px" }}>
-        <div style={{ maxWidth: 1200, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
-          {[
-            { title: "Performance Score", body: "Get an overall performance score based on visual appeal, clarity, and engagement metrics" },
-            { title: "Real-Time Analysis", body: "Receive real-time analysis and recommendations in seconds" },
-            { title: "Audience Insights", body: "Understand how your creative resonates with different audience segments" },
-            { title: "Visual Hierarchy", body: "See how attention flows through your ad and identify weak focal points" },
-            { title: "CTA Effectiveness", body: "Evaluate whether your call-to-action drives the intended user behaviour" },
-            { title: "Copy Clarity", body: "Measure how clearly your message communicates the core value proposition" },
-          ].map(f => (
-            <div key={f.title} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, padding: "24px 22px" }}>
-              <h3 style={{ fontSize: "1rem", fontWeight: 700, margin: "0 0 10px" }}>{f.title}</h3>
-              <p style={{ fontSize: "0.9rem", color: "var(--text-muted)", lineHeight: 1.65, margin: 0 }}>{f.body}</p>
-            </div>
-          ))}
+        <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+          <h2 style={{ textAlign: "center", fontSize: "2.25rem", fontWeight: 800, letterSpacing: "-0.03em", margin: "0 0 48px" }}>Powerful Features</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
+            {FEATURES.map(f => (
+              <div key={f.title} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, padding: "24px 22px" }}>
+                <div style={{ marginBottom: 16 }}>{f.icon}</div>
+                <h3 style={{ fontSize: "1rem", fontWeight: 700, margin: "0 0 10px" }}>{f.title}</h3>
+                <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", lineHeight: 1.65, margin: 0 }}>{f.body}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -223,7 +220,7 @@ export function AdCraftStudio() {
       <section style={{ background: "var(--surface)", padding: "80px 24px" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64, alignItems: "center" }}>
           <div>
-            <h2 style={{ fontSize: "2rem", fontWeight: 800, letterSpacing: "-0.03em", margin: "0 0 20px" }}>Deep Creative Analysis</h2>
+            <h2 style={{ fontSize: "2.25rem", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.15, margin: "0 0 20px" }}>See Your Creative Score in Action</h2>
             <p style={{ fontSize: "1rem", color: "var(--text-muted)", lineHeight: 1.7, margin: "0 0 16px" }}>
               Our AI analyzes every aspect of your ad creative and provides a comprehensive breakdown of performance metrics.
             </p>
@@ -232,24 +229,28 @@ export function AdCraftStudio() {
             </p>
           </div>
           <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 18, padding: 28 }}>
+            {/* Circular score gauge */}
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 28 }}>
+              <ScoreGauge score={84} />
+            </div>
             {[
               { label: "Visual Appeal", value: 92 },
               { label: "Message Clarity", value: 78 },
               { label: "Call-to-Action", value: 85 },
             ].map(m => (
-              <div key={m.label} style={{ marginBottom: 20 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                  <span style={{ fontSize: "0.9rem", color: "var(--text-subtle)" }}>{m.label}</span>
-                  <span style={{ fontSize: "0.9rem", fontWeight: 700 }}>{m.value}%</span>
+              <div key={m.label} style={{ marginBottom: 18 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 7 }}>
+                  <span style={{ fontSize: "0.875rem", color: "var(--text-subtle)" }}>{m.label}</span>
+                  <span style={{ fontSize: "0.875rem", fontWeight: 700 }}>{m.value}%</span>
                 </div>
-                <div style={{ height: 6, background: "rgba(255,255,255,0.08)", borderRadius: 999 }}>
+                <div style={{ height: 5, background: "rgba(255,255,255,0.08)", borderRadius: 999 }}>
                   <div style={{ height: "100%", width: `${m.value}%`, background: "var(--blue)", borderRadius: 999 }} />
                 </div>
               </div>
             ))}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 16 }}>
               {["Strong visual hierarchy", "Clear value prop", "High contrast"].map(tag => (
-                <span key={tag} style={{ border: "1px solid rgba(255,255,255,0.2)", borderRadius: 8, padding: "5px 12px", fontSize: "0.8rem", color: "var(--text-subtle)" }}>{tag}</span>
+                <span key={tag} style={{ border: "1px solid rgba(255,255,255,0.18)", borderRadius: 8, padding: "5px 12px", fontSize: "0.8rem", color: "var(--text-subtle)" }}>{tag}</span>
               ))}
             </div>
           </div>
@@ -412,6 +413,82 @@ function SelectField({ label, value, onChange, children }: { label: string; valu
         {children}
       </select>
     </label>
+  );
+}
+
+const FEATURES = [
+  {
+    title: "Creative Scoring",
+    body: "Get an overall performance score based on visual appeal, clarity, and engagement metrics",
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+      </svg>
+    ),
+  },
+  {
+    title: "Instant Feedback",
+    body: "Receive real-time analysis and recommendations in seconds",
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+      </svg>
+    ),
+  },
+  {
+    title: "Audience Targeting",
+    body: "Understand how your creative resonates with different audience segments",
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" />
+      </svg>
+    ),
+  },
+  {
+    title: "Performance Predictions",
+    body: "AI-powered forecasting of CTR, engagement, and conversion potential",
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" />
+      </svg>
+    ),
+  },
+  {
+    title: "A/B Testing Insights",
+    body: "Compare multiple creatives and identify the strongest performers",
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      </svg>
+    ),
+  },
+  {
+    title: "Detailed Analytics",
+    body: "Deep dive into design elements, copy effectiveness, and visual hierarchy",
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" />
+      </svg>
+    ),
+  },
+];
+
+function ScoreGauge({ score }: { score: number }) {
+  const r = 52;
+  const circ = 2 * Math.PI * r;
+  const dash = (score / 100) * circ;
+  return (
+    <div style={{ position: "relative", width: 120, height: 120, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <svg width="120" height="120" style={{ position: "absolute", transform: "rotate(-90deg)" }}>
+        <circle cx="60" cy="60" r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8" />
+        <circle cx="60" cy="60" r={r} fill="none" stroke="var(--blue)" strokeWidth="8"
+          strokeDasharray={`${dash} ${circ}`} strokeLinecap="round" />
+      </svg>
+      <div style={{ textAlign: "center" }}>
+        <p style={{ margin: 0, fontSize: "2rem", fontWeight: 800, lineHeight: 1 }}>{score}</p>
+        <p style={{ margin: 0, fontSize: "0.7rem", color: "var(--text-muted)" }}>/100</p>
+      </div>
+    </div>
   );
 }
 
