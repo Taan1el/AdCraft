@@ -6,6 +6,7 @@ import {
   FormEvent,
   ReactNode,
   useEffect,
+  useRef,
   useMemo,
   useState,
 } from "react";
@@ -13,50 +14,27 @@ import {
 import { analyzeCreative, DEMO_MODE } from "@/lib/api";
 import { AdType, AnalysisResponse, CategoryScores } from "@/lib/types";
 
-const AD_TYPES: Array<{
-  value: AdType;
-  label: string;
-  description: string;
-}> = [
-  {
-    value: "landing_hero",
-    label: "Landing hero",
-    description: "Homepage hero, product page intro, or offer section.",
-  },
-  {
-    value: "display_ad",
-    label: "Display ad",
-    description: "Static banner or paid creative with a tight CTA.",
-  },
-  {
-    value: "social_ad",
-    label: "Social ad",
-    description: "Feed-first creative that needs immediate clarity.",
-  },
-  {
-    value: "email_hero",
-    label: "Email hero",
-    description: "Top-section email promo or campaign header.",
-  },
+const AD_TYPES: Array<{ value: AdType; label: string; description: string }> = [
+  { value: "landing_hero", label: "Landing hero", description: "Homepage hero, product page intro, or offer section." },
+  { value: "display_ad", label: "Display ad", description: "Static banner or paid creative with a tight CTA." },
+  { value: "social_ad", label: "Social ad", description: "Feed-first creative that needs immediate clarity." },
+  { value: "email_hero", label: "Email hero", description: "Top-section email promo or campaign header." },
 ];
 
-const CATEGORY_LABELS: Array<{
-  key: keyof CategoryScores;
-  label: string;
-}> = [
-  { key: "visualHierarchy", label: "Visual hierarchy" },
-  { key: "ctaProminence", label: "CTA prominence" },
-  { key: "copyClarity", label: "Copy clarity" },
+const CATEGORY_LABELS: Array<{ key: keyof CategoryScores; label: string }> = [
+  { key: "visualHierarchy", label: "Visual Hierarchy" },
+  { key: "ctaProminence", label: "CTA Prominence" },
+  { key: "copyClarity", label: "Copy Clarity" },
   { key: "readability", label: "Readability" },
-  { key: "layoutBalance", label: "Layout balance" },
-  { key: "trustSignals", label: "Trust signals" },
+  { key: "layoutBalance", label: "Layout Balance" },
+  { key: "trustSignals", label: "Trust Signals" },
 ];
 
 const METRIC_LABELS: Record<string, string> = {
   whitespaceRatio: "Whitespace",
-  visualDensity: "Density",
+  visualDensity: "Visual Density",
   contrastScore: "Contrast",
-  ctaSaliencyScore: "CTA saliency",
+  ctaSaliencyScore: "CTA Saliency",
 };
 
 export function AdCraftStudio() {
@@ -69,604 +47,380 @@ export function AdCraftStudio() {
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const uploadRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    if (!file) {
-      setPreviewUrl("");
-      return;
-    }
-
-    const objectUrl = URL.createObjectURL(file);
-    setPreviewUrl(objectUrl);
-
-    return () => URL.revokeObjectURL(objectUrl);
+    if (!file) { setPreviewUrl(""); return; }
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
   }, [file]);
 
-  const selectedAdType = useMemo(
-    () => AD_TYPES.find((type) => type.value === adType),
-    [adType],
-  );
+  const selectedAdType = useMemo(() => AD_TYPES.find((t) => t.value === adType), [adType]);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!file) {
-      setError("Upload a creative before running the analysis.");
-      return;
-    }
-
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!file) { setError("Upload a creative before running the analysis."); return; }
     try {
       setLoading(true);
       setError("");
-
-      const nextAnalysis = await analyzeCreative({
-        file,
-        adType,
-        campaignGoal: campaignGoal.trim(),
-        audience: audience.trim(),
-        brandName: brandName.trim(),
-      });
-
-      setAnalysis(nextAnalysis);
-    } catch (submissionError) {
-      setError(
-        submissionError instanceof Error
-          ? submissionError.message
-          : "Analysis failed. Please try again.",
-      );
+      const result = await analyzeCreative({ file, adType, campaignGoal: campaignGoal.trim(), audience: audience.trim(), brandName: brandName.trim() });
+      setAnalysis(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Analysis failed. Please try again.");
     } finally {
       setLoading(false);
     }
   }
 
-  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const nextFile = event.target.files?.[0] ?? null;
-    setFile(nextFile);
+  function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
+    const next = e.target.files?.[0] ?? null;
+    setFile(next);
     setAnalysis(null);
     setError("");
   }
 
-  return (
-    <main className="relative min-h-screen overflow-hidden bg-[var(--color-paper)] text-[var(--color-ink)]">
-      {DEMO_MODE ? (
-        <div className="relative z-10 flex items-center justify-center gap-3 bg-[var(--color-accent)] px-4 py-2.5 text-center text-sm font-semibold text-[var(--color-accent-ink)]">
-          <span className="inline-block h-2 w-2 rounded-full bg-[var(--color-accent-ink)] opacity-70" />
-          Demo mode — scores and annotations are illustrative. Run the API locally for live analysis.
-        </div>
-      ) : null}
-      <div className="studio-grid pointer-events-none absolute inset-0 opacity-60" />
-      <div className="studio-noise pointer-events-none absolute inset-0 opacity-35" />
+  function scrollToUpload() {
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(() => uploadRef.current?.click(), 400);
+  }
 
-      <section className="relative mx-auto flex w-full max-w-7xl flex-col gap-10 px-5 py-8 sm:px-8 lg:px-12 lg:py-12">
-        <header className="grid gap-8 rounded-[2rem] border border-black/10 bg-white/75 p-6 shadow-[0_25px_80px_rgba(31,24,18,0.08)] backdrop-blur md:grid-cols-[1.1fr_0.9fr] md:p-8">
-          <div className="space-y-5">
-            <span className="inline-flex items-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-[var(--color-muted)]">
-              Conversion critique studio
-            </span>
-            <div className="space-y-4">
-              <h1 className="max-w-3xl font-display text-5xl leading-[0.95] tracking-[-0.04em] text-[var(--color-ink)] sm:text-6xl">
-                AdCraft AI turns pretty creatives into accountable ones.
-              </h1>
-              <p className="max-w-2xl text-base leading-7 text-[var(--color-muted)] sm:text-lg">
-                Upload a banner, hero, or social ad and get a structured review of
-                hierarchy, CTA pull, readability, and conversion friction. The
-                output is built for iteration, not vague praise.
-              </p>
+  function reset() {
+    setFile(null);
+    setAnalysis(null);
+    setError("");
+    setCampaignGoal("");
+    setAudience("");
+    setBrandName("");
+  }
+
+  if (analysis && previewUrl && !loading) {
+    return <AnalysisView analysis={analysis} previewUrl={previewUrl} onReset={reset} />;
+  }
+
+  return (
+    <div style={{ background: "var(--bg)", color: "var(--text)", minHeight: "100vh" }}>
+      {DEMO_MODE && (
+        <div style={{ background: "var(--blue)", color: "#fff", textAlign: "center", padding: "10px 16px", fontSize: "13px", fontWeight: 600 }}>
+          Demo mode — scores are illustrative. Run the API locally for live analysis.
+        </div>
+      )}
+
+      {/* Hero */}
+      <section style={{ maxWidth: 1200, margin: "0 auto", padding: "80px 24px 100px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64, alignItems: "center" }}>
+        <div>
+          <h1 style={{ fontSize: "clamp(2.5rem, 5vw, 3.75rem)", fontWeight: 800, lineHeight: 1.05, letterSpacing: "-0.03em", margin: "0 0 20px" }}>
+            Transform Your Ad Creative with AI-Powered Insights
+          </h1>
+          <p style={{ fontSize: "1.0625rem", color: "var(--text-muted)", lineHeight: 1.7, margin: "0 0 36px", maxWidth: 460 }}>
+            Get instant performance scores, actionable recommendations, and data-driven insights to make every ad creative count.
+          </p>
+          <button onClick={scrollToUpload} style={{ background: "var(--blue)", color: "#fff", border: "none", borderRadius: 12, padding: "14px 28px", fontSize: "1rem", fontWeight: 700, cursor: "pointer", transition: "background 0.15s" }}
+            onMouseEnter={e => (e.currentTarget.style.background = "var(--blue-hover)")}
+            onMouseLeave={e => (e.currentTarget.style.background = "var(--blue)")}>
+            Analyze Your Creative
+          </button>
+        </div>
+
+        {/* Upload card */}
+        <section ref={formRef}>
+          <form onSubmit={handleSubmit}>
+            <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 20, padding: 24 }}>
+              {/* Drop zone */}
+              <label style={{ display: "block", cursor: "pointer" }}>
+                <input ref={uploadRef} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={handleFileChange} />
+                <div style={{ border: "2px dashed var(--border-dashed)", borderRadius: 14, padding: previewUrl ? 0 : "48px 24px", textAlign: "center", overflow: "hidden" }}>
+                  {previewUrl ? (
+                    <img src={previewUrl} alt="Preview" style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: 12 }} />
+                  ) : (
+                    <>
+                      <UploadIcon />
+                      <div style={{ marginTop: 16 }}>
+                        <span style={{ display: "inline-block", background: "var(--blue)", color: "#fff", borderRadius: 999, padding: "10px 24px", fontSize: "0.9rem", fontWeight: 700 }}>
+                          Upload Image
+                        </span>
+                      </div>
+                      <p style={{ margin: "12px 0 4px", color: "var(--text-subtle)", fontSize: "0.875rem" }}>or drop a file</p>
+                      <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.8rem" }}>PNG, JPG or WEBP</p>
+                    </>
+                  )}
+                </div>
+              </label>
+
+              {file && (
+                <div style={{ marginTop: 20, display: "grid", gap: 12 }}>
+                  <SelectField label="Asset type" value={adType} onChange={v => setAdType(v as AdType)}>
+                    {AD_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </SelectField>
+                  <p style={{ margin: "0 0 4px", fontSize: "0.8rem", color: "var(--text-muted)" }}>{selectedAdType?.description}</p>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <InputField label="Campaign goal" placeholder="Drive signups, increase CTR…" value={campaignGoal} onChange={setCampaignGoal} />
+                    <InputField label="Audience" placeholder="Students, freelancers…" value={audience} onChange={setAudience} />
+                  </div>
+                  <InputField label="Brand name" placeholder="Optional" value={brandName} onChange={setBrandName} />
+                </div>
+              )}
+
+              {error && (
+                <div style={{ marginTop: 16, background: "rgba(220,38,38,0.1)", border: "1px solid rgba(220,38,38,0.3)", borderRadius: 10, padding: "10px 14px", fontSize: "0.875rem", color: "#fca5a5" }}>
+                  {error}
+                </div>
+              )}
+
+              {file && (
+                <button type="submit" disabled={loading} style={{ marginTop: 16, width: "100%", background: loading ? "var(--surface-2)" : "var(--blue)", color: loading ? "var(--text-muted)" : "#fff", border: "none", borderRadius: 12, padding: "13px 24px", fontSize: "0.9375rem", fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", transition: "background 0.15s" }}>
+                  {loading ? "Analyzing…" : "Run Critique"}
+                </button>
+              )}
             </div>
-            <div className="flex flex-wrap gap-3 text-sm text-[var(--color-muted)]">
-              <Tag>Image-first critique</Tag>
-              <Tag>Typed API contract</Tag>
-              <Tag>Deterministic fallback</Tag>
-              <Tag>Optional AI refinement</Tag>
+          </form>
+        </section>
+      </section>
+
+      {/* How It Works */}
+      <section style={{ background: "var(--surface)", padding: "80px 24px" }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+          <h2 style={{ textAlign: "center", fontSize: "2.25rem", fontWeight: 800, letterSpacing: "-0.03em", margin: "0 0 56px" }}>How It Works</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 40, textAlign: "center" }}>
+            {[
+              { n: 1, title: "Upload Your Creative", body: "Simply drag and drop your ad creative or paste a link" },
+              { n: 2, title: "AI Analysis", body: "Our AI evaluates design, messaging, and engagement potential" },
+              { n: 3, title: "Get Actionable Insights", body: "Receive detailed scores and recommendations to optimize" },
+            ].map(step => (
+              <div key={step.n}>
+                <div style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--blue)", color: "#fff", fontSize: "1.375rem", fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+                  {step.n}
+                </div>
+                <h3 style={{ fontSize: "1.125rem", fontWeight: 700, margin: "0 0 10px" }}>{step.title}</h3>
+                <p style={{ fontSize: "0.9375rem", color: "var(--text-muted)", lineHeight: 1.65, margin: 0 }}>{step.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section style={{ padding: "80px 24px" }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
+          {[
+            { title: "Performance Score", body: "Get an overall performance score based on visual appeal, clarity, and engagement metrics" },
+            { title: "Real-Time Analysis", body: "Receive real-time analysis and recommendations in seconds" },
+            { title: "Audience Insights", body: "Understand how your creative resonates with different audience segments" },
+            { title: "Visual Hierarchy", body: "See how attention flows through your ad and identify weak focal points" },
+            { title: "CTA Effectiveness", body: "Evaluate whether your call-to-action drives the intended user behaviour" },
+            { title: "Copy Clarity", body: "Measure how clearly your message communicates the core value proposition" },
+          ].map(f => (
+            <div key={f.title} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, padding: "24px 22px" }}>
+              <h3 style={{ fontSize: "1rem", fontWeight: 700, margin: "0 0 10px" }}>{f.title}</h3>
+              <p style={{ fontSize: "0.9rem", color: "var(--text-muted)", lineHeight: 1.65, margin: 0 }}>{f.body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* AI Analysis preview */}
+      <section style={{ background: "var(--surface)", padding: "80px 24px" }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64, alignItems: "center" }}>
+          <div>
+            <h2 style={{ fontSize: "2rem", fontWeight: 800, letterSpacing: "-0.03em", margin: "0 0 20px" }}>Deep Creative Analysis</h2>
+            <p style={{ fontSize: "1rem", color: "var(--text-muted)", lineHeight: 1.7, margin: "0 0 16px" }}>
+              Our AI analyzes every aspect of your ad creative and provides a comprehensive breakdown of performance metrics.
+            </p>
+            <p style={{ fontSize: "1rem", color: "var(--text-muted)", lineHeight: 1.7, margin: 0 }}>
+              From visual appeal to message clarity, you'll get the insights you need to create high-performing ads.
+            </p>
+          </div>
+          <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 18, padding: 28 }}>
+            {[
+              { label: "Visual Appeal", value: 92 },
+              { label: "Message Clarity", value: 78 },
+              { label: "Call-to-Action", value: 85 },
+            ].map(m => (
+              <div key={m.label} style={{ marginBottom: 20 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span style={{ fontSize: "0.9rem", color: "var(--text-subtle)" }}>{m.label}</span>
+                  <span style={{ fontSize: "0.9rem", fontWeight: 700 }}>{m.value}%</span>
+                </div>
+                <div style={{ height: 6, background: "rgba(255,255,255,0.08)", borderRadius: 999 }}>
+                  <div style={{ height: "100%", width: `${m.value}%`, background: "var(--blue)", borderRadius: 999 }} />
+                </div>
+              </div>
+            ))}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+              {["Strong visual hierarchy", "Clear value prop", "High contrast"].map(tag => (
+                <span key={tag} style={{ border: "1px solid rgba(255,255,255,0.2)", borderRadius: 8, padding: "5px 12px", fontSize: "0.8rem", color: "var(--text-subtle)" }}>{tag}</span>
+              ))}
             </div>
           </div>
+        </div>
+      </section>
 
-          <div className="rounded-[1.75rem] border border-[var(--color-border)] bg-[var(--color-ink)] p-5 text-[var(--color-paper)] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-            <div className="mb-4 flex items-center justify-between">
-              <p className="text-sm uppercase tracking-[0.22em] text-white/45">
-                Review rubric
-              </p>
-              <p className="text-sm text-white/55">V1 scope</p>
+      {/* CTA */}
+      <section style={{ padding: "100px 24px", textAlign: "center" }}>
+        <h2 style={{ fontSize: "2.5rem", fontWeight: 800, letterSpacing: "-0.03em", margin: "0 0 32px" }}>Ready to Optimize Your Ad Creative?</h2>
+        <button onClick={scrollToUpload} style={{ background: "var(--blue)", color: "#fff", border: "none", borderRadius: 12, padding: "16px 36px", fontSize: "1.0625rem", fontWeight: 700, cursor: "pointer", transition: "background 0.15s" }}
+          onMouseEnter={e => (e.currentTarget.style.background = "var(--blue-hover)")}
+          onMouseLeave={e => (e.currentTarget.style.background = "var(--blue)")}>
+          Get Started Now
+        </button>
+      </section>
+    </div>
+  );
+}
+
+function AnalysisView({ analysis, previewUrl, onReset }: { analysis: AnalysisResponse; previewUrl: string; onReset: () => void }) {
+  return (
+    <div style={{ background: "var(--bg)", color: "var(--text)", minHeight: "100vh", padding: "48px 24px" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 40 }}>
+          <div>
+            <p style={{ margin: "0 0 6px", fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.2em", color: "var(--text-muted)" }}>Conversion Report</p>
+            <h1 style={{ margin: 0, fontSize: "2.25rem", fontWeight: 800, letterSpacing: "-0.03em" }}>Review Complete</h1>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 24px", textAlign: "center" }}>
+              <p style={{ margin: "0 0 4px", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.2em", color: "var(--text-muted)" }}>Overall</p>
+              <p style={{ margin: 0, fontSize: "2.5rem", fontWeight: 800, lineHeight: 1 }}>{analysis.overallScore}</p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {CATEGORY_LABELS.map((category) => (
-                <div
-                  key={category.key}
-                  className="rounded-2xl border border-white/10 bg-white/5 p-4"
-                >
-                  <p className="text-sm font-semibold text-white">{category.label}</p>
-                  <p className="mt-2 text-sm leading-6 text-white/60">
-                    Structured score plus concrete issues and suggested fixes.
-                  </p>
+            <button onClick={onReset} style={{ background: "var(--surface)", color: "var(--text-subtle)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 18px", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer" }}>
+              ← New analysis
+            </button>
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 28 }}>
+          {/* Left column */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            {/* Annotated preview */}
+            <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 18, overflow: "hidden" }}>
+              <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--border)" }}>
+                <p style={{ margin: 0, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.2em", color: "var(--text-muted)" }}>Annotated Preview</p>
+              </div>
+              <div style={{ position: "relative" }}>
+                <img src={previewUrl} alt="Annotated creative" style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", display: "block" }} />
+                <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+                  {analysis.annotations.map(a => (
+                    <div key={a.id} style={{ position: "absolute", left: `${a.x * 100}%`, top: `${a.y * 100}%`, width: `${a.w * 100}%`, height: `${a.h * 100}%`, border: "2px solid var(--blue)", borderRadius: 8, background: "rgba(77,124,254,0.12)" }}>
+                      <span style={{ position: "absolute", top: 6, left: 6, background: "var(--blue)", color: "#fff", borderRadius: 4, padding: "2px 7px", fontSize: "0.65rem", fontWeight: 700, textTransform: "uppercase" }}>{a.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div style={{ padding: "12px 18px", fontSize: "0.875rem", color: "var(--text-muted)", lineHeight: 1.65 }}>{analysis.summary}</div>
+            </div>
+
+            {/* Category scores */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+              {CATEGORY_LABELS.map(c => (
+                <div key={c.key} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 14px" }}>
+                  <p style={{ margin: "0 0 10px", fontSize: "0.8rem", color: "var(--text-muted)" }}>{c.label}</p>
+                  <p style={{ margin: "0 0 8px", fontSize: "1.875rem", fontWeight: 800, lineHeight: 1 }}>{analysis.categoryScores[c.key]}</p>
+                  <div style={{ height: 4, background: "rgba(255,255,255,0.08)", borderRadius: 999 }}>
+                    <div style={{ height: "100%", width: `${analysis.categoryScores[c.key]}%`, background: "var(--blue)", borderRadius: 999 }} />
+                  </div>
                 </div>
               ))}
             </div>
           </div>
-        </header>
 
-        <div className="grid gap-8 xl:grid-cols-[0.84fr_1.16fr]">
-          <form
-            onSubmit={handleSubmit}
-            className="rounded-[2rem] border border-black/10 bg-white/80 p-5 shadow-[0_30px_80px_rgba(31,24,18,0.07)] backdrop-blur md:p-6"
-          >
-            <div className="mb-6 flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm uppercase tracking-[0.22em] text-[var(--color-muted)]">
-                  Creative intake
-                </p>
-                <h2 className="mt-2 font-display text-3xl tracking-[-0.03em]">
-                  Feed the evaluator
-                </h2>
-              </div>
-              <div className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm text-[var(--color-muted)]">
-                {selectedAdType?.label}
-              </div>
-            </div>
+          {/* Right column */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            {/* Summary */}
+            <Card label="Summary">
+              <p style={{ margin: 0, fontSize: "0.9375rem", color: "var(--text-subtle)", lineHeight: 1.7 }}>{analysis.summary}</p>
+            </Card>
 
-            <label className="group flex cursor-pointer flex-col gap-4 rounded-[1.5rem] border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-4 transition hover:border-[var(--color-accent)] hover:bg-[#f4ede3]">
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                className="sr-only"
-                onChange={handleFileChange}
-              />
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-[var(--color-ink)]">
-                    Upload a single creative
-                  </p>
-                  <p className="mt-1 text-sm text-[var(--color-muted)]">
-                    PNG, JPG, or WEBP. Keep it to one strong frame.
-                  </p>
-                </div>
-                <span className="rounded-full bg-[var(--color-accent)] px-3 py-1 text-sm font-semibold text-[var(--color-accent-ink)]">
-                  Choose file
-                </span>
-              </div>
-
-              <div className="relative overflow-hidden rounded-[1.25rem] border border-[var(--color-border)] bg-white/70">
-                {previewUrl ? (
-                  <img
-                    src={previewUrl}
-                    alt="Uploaded creative preview"
-                    className="aspect-[4/3] w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex aspect-[4/3] items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(199,131,55,0.17),_transparent_42%),linear-gradient(135deg,#fbf6ef,#efe6d7)] p-8 text-center">
-                    <div className="space-y-3">
-                      <p className="font-display text-3xl tracking-[-0.03em] text-[var(--color-ink)]">
-                        Drag a creative here
-                      </p>
-                      <p className="mx-auto max-w-xs text-sm leading-6 text-[var(--color-muted)]">
-                        The report will highlight pressure points instead of
-                        dumping a wall of generic advice.
-                      </p>
+            {/* Issues */}
+            <Card label="Key Issues">
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {analysis.issues.map(issue => (
+                  <div key={issue.id} style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                      <p style={{ margin: 0, fontSize: "0.875rem", fontWeight: 700 }}>{issue.title}</p>
+                      <span style={{ fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.12em", border: "1px solid var(--border)", borderRadius: 6, padding: "2px 8px", color: "var(--text-muted)" }}>{issue.severity}</span>
                     </div>
+                    <p style={{ margin: "0 0 4px", fontSize: "0.775rem", color: "var(--text-muted)", textTransform: "capitalize" }}>{issue.category.replace(/([A-Z])/g, " $1")}</p>
+                    <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-subtle)", lineHeight: 1.65 }}>{issue.description}</p>
                   </div>
-                )}
+                ))}
               </div>
-            </label>
+            </Card>
 
-            <div className="mt-6 grid gap-4">
-              <label className="grid gap-2">
-                <span className="text-sm font-semibold text-[var(--color-muted)]">
-                  Asset type
-                </span>
-                <select
-                  value={adType}
-                  onChange={(event) => setAdType(event.target.value as AdType)}
-                  className="rounded-2xl border border-[var(--color-border)] bg-white px-4 py-3 text-sm text-[var(--color-ink)] outline-none transition focus:border-[var(--color-accent)]"
-                >
-                  {AD_TYPES.map((type) => (
-                    <option key={type.value} value={type.value}>
-                      {type.label}
-                    </option>
-                  ))}
-                </select>
-                <span className="text-sm text-[var(--color-muted)]">
-                  {selectedAdType?.description}
-                </span>
-              </label>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <Field
-                  label="Campaign goal"
-                  placeholder="Drive signups, increase CTR, announce an offer"
-                  value={campaignGoal}
-                  onChange={setCampaignGoal}
-                />
-                <Field
-                  label="Audience"
-                  placeholder="Students, freelancers, first-time buyers"
-                  value={audience}
-                  onChange={setAudience}
-                />
+            {/* Recommendations */}
+            <Card label="Recommended Fixes">
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {analysis.recommendations.map(r => (
+                  <div key={r.id} style={{ background: "rgba(77,124,254,0.08)", border: "1px solid rgba(77,124,254,0.2)", borderRadius: 12, padding: "14px 16px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <p style={{ margin: 0, fontSize: "0.875rem", fontWeight: 700 }}>{r.title}</p>
+                      <span style={{ fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.12em", background: "var(--blue)", color: "#fff", borderRadius: 6, padding: "2px 8px" }}>{r.priority}</span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-subtle)", lineHeight: 1.65 }}>{r.action}</p>
+                  </div>
+                ))}
               </div>
+            </Card>
 
-              <Field
-                label="Brand name"
-                placeholder="Optional, used to tailor the critique language"
-                value={brandName}
-                onChange={setBrandName}
-              />
-            </div>
-
-            {error ? (
-              <div className="mt-5 rounded-2xl border border-[#d77d73] bg-[#fff2ef] px-4 py-3 text-sm text-[#8b3a2f]">
-                {error}
+            {/* Metrics */}
+            <Card label="Metric Snapshot">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                {Object.entries(analysis.metrics).map(([key, value]) => (
+                  <div key={key} style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 14px" }}>
+                    <p style={{ margin: "0 0 8px", fontSize: "0.8rem", color: "var(--text-muted)" }}>{METRIC_LABELS[key] ?? key}</p>
+                    <div style={{ height: 4, background: "rgba(255,255,255,0.08)", borderRadius: 999, marginBottom: 8 }}>
+                      <div style={{ height: "100%", width: `${Math.round(value * 100)}%`, background: "var(--blue)", borderRadius: 999 }} />
+                    </div>
+                    <p style={{ margin: 0, fontSize: "1rem", fontWeight: 700 }}>{Math.round(value * 100)} / 100</p>
+                  </div>
+                ))}
               </div>
-            ) : null}
-
-            <div className="mt-6 flex flex-wrap items-center gap-3">
-              <button
-                type="submit"
-                disabled={loading}
-                className="inline-flex min-w-44 items-center justify-center rounded-full bg-[var(--color-ink)] px-6 py-3 text-sm font-semibold text-[var(--color-paper)] transition hover:translate-y-[-1px] hover:bg-[#241b15] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {loading ? "Analyzing creative..." : "Run critique"}
-              </button>
-              <p className="text-sm text-[var(--color-muted)]">
-                Backend returns typed JSON only. No freeform AI blob.
-              </p>
-            </div>
-          </form>
-
-          <section className="rounded-[2rem] border border-black/10 bg-[#1f1812] p-5 text-[var(--color-paper)] shadow-[0_30px_90px_rgba(31,24,18,0.16)] md:p-6">
-            {loading ? (
-              <LoadingState />
-            ) : analysis && previewUrl ? (
-              <AnalysisPanel analysis={analysis} previewUrl={previewUrl} />
-            ) : (
-              <EmptyState />
-            )}
-          </section>
+            </Card>
+          </div>
         </div>
-      </section>
-    </main>
+      </div>
+    </div>
   );
 }
 
-function Field({
-  label,
-  placeholder,
-  value,
-  onChange,
-}: {
-  label: string;
-  placeholder: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
+function Card({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="grid gap-2">
-      <span className="text-sm font-semibold text-[var(--color-muted)]">
-        {label}
-      </span>
-      <input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        className="rounded-2xl border border-[var(--color-border)] bg-white px-4 py-3 text-sm text-[var(--color-ink)] outline-none transition placeholder:text-[#9d8b7d] focus:border-[var(--color-accent)]"
-      />
+    <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 18, padding: 20 }}>
+      <p style={{ margin: "0 0 14px", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.2em", color: "var(--text-muted)" }}>{label}</p>
+      {children}
+    </div>
+  );
+}
+
+function InputField({ label, placeholder, value, onChange }: { label: string; placeholder: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <label style={{ display: "grid", gap: 6 }}>
+      <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-muted)" }}>{label}</span>
+      <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+        style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 14px", fontSize: "0.875rem", color: "var(--text)", outline: "none", width: "100%" }} />
     </label>
   );
 }
 
-function Tag({ children }: { children: ReactNode }) {
+function SelectField({ label, value, onChange, children }: { label: string; value: string; onChange: (v: string) => void; children: ReactNode }) {
   return (
-    <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5">
-      {children}
-    </span>
+    <label style={{ display: "grid", gap: 6 }}>
+      <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-muted)" }}>{label}</span>
+      <select value={value} onChange={e => onChange(e.target.value)}
+        style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 14px", fontSize: "0.875rem", color: "var(--text)", outline: "none" }}>
+        {children}
+      </select>
+    </label>
   );
 }
 
-function EmptyState() {
+function UploadIcon() {
   return (
-    <div className="flex h-full min-h-[42rem] flex-col justify-between rounded-[1.75rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-5">
-      <div>
-        <p className="text-sm uppercase tracking-[0.22em] text-white/45">
-          Analysis surface
-        </p>
-        <h2 className="mt-3 max-w-2xl font-display text-4xl tracking-[-0.03em] text-white">
-          The report appears here once the creative enters the system.
-        </h2>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-[1.1fr_0.9fr]">
-        <div className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(226,170,94,0.22),_transparent_38%),linear-gradient(145deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] p-5">
-          <p className="text-xs uppercase tracking-[0.2em] text-white/45">
-            What you will get
-          </p>
-          <div className="mt-4 grid gap-3">
-            <GhostCard
-              title="Score breakdown"
-              body="Six category scores with an overall conversion read."
-            />
-            <GhostCard
-              title="Annotated preview"
-              body="Issue zones rendered directly over the creative."
-            />
-            <GhostCard
-              title="Actionable fixes"
-              body="Recommendations written like product feedback, not filler."
-            />
-          </div>
-        </div>
-
-        <div className="rounded-[1.5rem] border border-dashed border-white/12 p-5">
-          <p className="text-sm font-semibold text-white">MVP discipline</p>
-          <ul className="mt-4 space-y-3 text-sm leading-6 text-white/62">
-            <li>No auth.</li>
-            <li>No dashboard sprawl.</li>
-            <li>No image generation in V1.</li>
-            <li>One strong loop: upload, critique, iterate.</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function LoadingState() {
-  return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm uppercase tracking-[0.22em] text-white/45">
-            Running analysis
-          </p>
-          <h2 className="mt-3 font-display text-4xl tracking-[-0.03em] text-white">
-            Parsing hierarchy, contrast, and CTA pull.
-          </h2>
-        </div>
-        <div className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/65">
-          This takes a moment
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-[1.1fr_0.9fr]">
-        <div className="animate-pulse space-y-4 rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
-          <div className="h-72 rounded-[1.25rem] bg-white/7" />
-          <div className="grid gap-3 sm:grid-cols-2">
-            {[...Array(4)].map((_, index) => (
-              <div key={index} className="h-24 rounded-[1.25rem] bg-white/7" />
-            ))}
-          </div>
-        </div>
-        <div className="animate-pulse space-y-4 rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
-          {[...Array(6)].map((_, index) => (
-            <div key={index} className="h-20 rounded-[1.25rem] bg-white/7" />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AnalysisPanel({
-  analysis,
-  previewUrl,
-}: {
-  analysis: AnalysisResponse;
-  previewUrl: string;
-}) {
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-sm uppercase tracking-[0.22em] text-white/45">
-            Conversion report
-          </p>
-          <h2 className="mt-3 font-display text-4xl tracking-[-0.03em] text-white">
-            Review complete
-          </h2>
-        </div>
-        <div className="rounded-[1.5rem] border border-white/10 bg-white/5 px-5 py-4 text-right">
-          <p className="text-xs uppercase tracking-[0.2em] text-white/45">
-            Overall score
-          </p>
-          <p className="mt-2 font-display text-5xl tracking-[-0.04em] text-white">
-            {analysis.overallScore}
-          </p>
-        </div>
-      </div>
-
-      <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
-        <div className="space-y-5">
-          <AnnotatedPreview
-            previewUrl={previewUrl}
-            annotations={analysis.annotations}
-            summary={analysis.summary}
-          />
-
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {CATEGORY_LABELS.map((category) => (
-              <ScoreCard
-                key={category.key}
-                label={category.label}
-                score={analysis.categoryScores[category.key]}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-5">
-          <section className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-5">
-            <p className="text-xs uppercase tracking-[0.2em] text-white/45">
-              Summary
-            </p>
-            <p className="mt-3 text-base leading-7 text-white/78">{analysis.summary}</p>
-          </section>
-
-          <section className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-5">
-            <p className="text-xs uppercase tracking-[0.2em] text-white/45">
-              Key issues
-            </p>
-            <div className="mt-4 space-y-3">
-              {analysis.issues.map((issue) => (
-                <IssueCard key={issue.id} {...issue} />
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-5">
-            <p className="text-xs uppercase tracking-[0.2em] text-white/45">
-              Recommended fixes
-            </p>
-            <div className="mt-4 space-y-3">
-              {analysis.recommendations.map((recommendation) => (
-                <RecommendationCard key={recommendation.id} {...recommendation} />
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-5">
-            <p className="text-xs uppercase tracking-[0.2em] text-white/45">
-              Metric snapshot
-            </p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {Object.entries(analysis.metrics).map(([key, value]) => (
-                <div
-                  key={key}
-                  className="rounded-[1.25rem] border border-white/10 bg-black/10 p-4"
-                >
-                  <p className="text-sm text-white/55">
-                    {METRIC_LABELS[key] ?? key}
-                  </p>
-                  <div className="mt-3 h-2 rounded-full bg-white/10">
-                    <div
-                      className="h-full rounded-full bg-[var(--color-accent)]"
-                      style={{ width: `${Math.round(value * 100)}%` }}
-                    />
-                  </div>
-                  <p className="mt-3 text-sm font-semibold text-white">
-                    {Math.round(value * 100)} / 100
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AnnotatedPreview({
-  previewUrl,
-  annotations,
-  summary,
-}: {
-  previewUrl: string;
-  annotations: AnalysisResponse["annotations"];
-  summary: string;
-}) {
-  return (
-    <section className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-white/[0.04]">
-      <div className="border-b border-white/10 px-5 py-4">
-        <p className="text-xs uppercase tracking-[0.2em] text-white/45">
-          Annotated preview
-        </p>
-      </div>
-
-      <div className="relative">
-        <img
-          src={previewUrl}
-          alt="Annotated creative"
-          className="aspect-[4/3] w-full object-cover"
-        />
-
-        <div className="pointer-events-none absolute inset-0">
-          {annotations.map((annotation) => (
-            <div
-              key={annotation.id}
-              className="absolute rounded-[1rem] border-2 border-[var(--color-accent)] bg-[rgba(226,170,94,0.18)] shadow-[0_0_0_1px_rgba(255,255,255,0.1)]"
-              style={{
-                left: `${annotation.x * 100}%`,
-                top: `${annotation.y * 100}%`,
-                width: `${annotation.w * 100}%`,
-                height: `${annotation.h * 100}%`,
-              }}
-            >
-              <div className="absolute left-2 top-2 rounded-full bg-[var(--color-accent)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--color-accent-ink)]">
-                {annotation.label}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="px-5 py-4 text-sm leading-6 text-white/62">{summary}</div>
-    </section>
-  );
-}
-
-function ScoreCard({ label, score }: { label: string; score: number }) {
-  return (
-    <div className="rounded-[1.4rem] border border-white/10 bg-white/[0.04] p-4">
-      <p className="text-sm text-white/55">{label}</p>
-      <div className="mt-3 flex items-end justify-between gap-4">
-        <p className="font-display text-4xl tracking-[-0.03em] text-white">
-          {score}
-        </p>
-        <div className="flex-1">
-          <div className="h-2 rounded-full bg-white/10">
-            <div
-              className="h-full rounded-full bg-white"
-              style={{ width: `${score}%` }}
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function IssueCard({
-  category,
-  severity,
-  title,
-  description,
-}: AnalysisResponse["issues"][number]) {
-  return (
-    <article className="rounded-[1.25rem] border border-white/10 bg-black/10 p-4">
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-sm font-semibold text-white">{title}</p>
-        <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-white/50">
-          {severity}
-        </span>
-      </div>
-      <p className="mt-2 text-sm text-white/55 capitalize">
-        {category.replace(/([A-Z])/g, " $1")}
-      </p>
-      <p className="mt-3 text-sm leading-6 text-white/72">{description}</p>
-    </article>
-  );
-}
-
-function RecommendationCard({
-  priority,
-  title,
-  action,
-}: AnalysisResponse["recommendations"][number]) {
-  return (
-    <article className="rounded-[1.25rem] border border-[rgba(226,170,94,0.2)] bg-[rgba(226,170,94,0.08)] p-4">
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-sm font-semibold text-white">{title}</p>
-        <span className="rounded-full bg-[var(--color-accent)] px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-[var(--color-accent-ink)]">
-          {priority}
-        </span>
-      </div>
-      <p className="mt-3 text-sm leading-6 text-white/78">{action}</p>
-    </article>
-  );
-}
-
-function GhostCard({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="rounded-[1.25rem] border border-white/10 bg-black/10 p-4">
-      <p className="text-sm font-semibold text-white">{title}</p>
-      <p className="mt-2 text-sm leading-6 text-white/58">{body}</p>
-    </div>
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ margin: "0 auto", display: "block" }}>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="17 8 12 3 7 8" />
+      <line x1="12" y1="3" x2="12" y2="15" />
+    </svg>
   );
 }
