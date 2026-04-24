@@ -25,9 +25,7 @@ export async function analyzeCreative(input: AnalyzeInput): Promise<AnalysisResp
   try {
     res = await fetch(`${base}/analyze`, { method: "POST", body: fd });
   } catch {
-    throw new Error(
-      `Could not reach the analysis API at ${base}. GitHub Pages only hosts the frontend, so analysis will fail until the backend is running and NEXT_PUBLIC_API_URL points to it.`
-    );
+    throw new Error(`Could not reach the API at ${base}. Is the backend running (and is NEXT_PUBLIC_API_URL set)?`);
   }
   if (!res.ok) {
     const text = await res.text().catch(() => "");

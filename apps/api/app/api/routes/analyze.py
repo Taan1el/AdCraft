@@ -32,11 +32,7 @@ async def analyze(request: Request) -> JSONResponse:
     if not settings.mock_analysis and not settings.has_llm_credentials:
         return JSONResponse(
             {
-                "error": (
-                    "AI analysis is enabled (MOCK_ANALYSIS=false) but no LLM credentials are set. "
-                    "Set GEMINI_API_KEY or OPENAI_API_KEY, or set MOCK_ANALYSIS=true for "
-                    "deterministic-only analysis without an API key."
-                )
+                "error": "Missing LLM credentials. Set GEMINI_API_KEY/OPENAI_API_KEY or set MOCK_ANALYSIS=true."
             },
             status_code=503,
         )

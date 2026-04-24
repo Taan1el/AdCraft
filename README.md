@@ -1,8 +1,8 @@
 # AdCraft AI
 
-**AdCraft** is a small full-stack tool for **critiquing static ad creatives** (display, landing hero, email hero, social). You upload an image; the app returns **scores**, **issues**, **concrete recommendations**, and an **annotation overlay** so feedback is easy to apply—not just a wall of text.
+**AdCraft** is a small full-stack tool for **critiquing static ad creatives** (display, landing hero, email hero, social). Upload an image and you’ll get **scores**, **issues**, **recommendations**, and an **annotation overlay** you can act on.
 
-It was built in the context of **email and lifecycle marketing**: teams ship a high volume of hero images and social assets, and “does this convert?” feedback is often subjective and slow. AdCraft is a **structured reviewer** you can run on demand.
+It was built in the context of **email and lifecycle marketing** where teams ship a lot of creative and feedback is often subjective. AdCraft tries to make that feedback faster and more consistent.
 
 **Repository:** [github.com/Taan1el/AdCraft](https://github.com/Taan1el/AdCraft)
 
