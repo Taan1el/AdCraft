@@ -26,7 +26,6 @@ def run_analysis(
     campaign_goal: str | None,
     audience: str | None,
     brand_name: str | None,
-    force_mock: bool,
 ) -> dict:
     metrics, annotations = compute_deterministic_metrics(image)
 
@@ -118,7 +117,7 @@ def run_analysis(
         },
     }
 
-    if force_mock or settings.mock_analysis:
+    if settings.mock_analysis:
         return base_response
 
     context = {"campaignGoal": campaign_goal, "audience": audience, "brandName": brand_name}

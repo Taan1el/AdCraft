@@ -11,7 +11,7 @@ import { UploadDropzone } from "@/components/upload/UploadDropzone";
 import { analyzeCreative } from "@/lib/api";
 import type { AdType, AnalysisResponse } from "@/lib/types";
 import { formatPct01 } from "@/lib/utils";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
@@ -22,6 +22,11 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResponse | null>(null);
+  const [isGitHubPages, setIsGitHubPages] = useState(false);
+
+  useEffect(() => {
+    setIsGitHubPages(window.location.hostname === "taan1el.github.io");
+  }, []);
 
   const canAnalyze = !!file && !loading;
 
@@ -75,6 +80,13 @@ export default function Home() {
 
         <main className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-5">
           <section className="lg:col-span-2 space-y-4">
+            {isGitHubPages ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                This GitHub Pages build is frontend-only. The Analyze action will work after the backend
+                is deployed and <code className="font-mono">NEXT_PUBLIC_API_URL</code> points to it.
+              </div>
+            ) : null}
+
             <UploadDropzone value={file} onChange={setFile} disabled={loading} />
             <AdTypeSelect value={adType} onChange={setAdType} />
 

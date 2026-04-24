@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# `apps/api/conftest.py` sets MOCK_ANALYSIS=true before collection so /analyze stays offline.
+
 from io import BytesIO
 
 from PIL import Image

@@ -10,6 +10,8 @@
     "dev:web": "npm --workspace apps/web run dev",
     "dev:api": "npm --workspace apps/api run dev",
     "dev": "npm run dev:api & npm run dev:web",
+    "dev:worker": "npm --workspace apps/worker run dev",
+    "deploy:worker": "npm --workspace apps/worker run deploy",
     "lint:web": "npm --workspace apps/web run lint",
     "typecheck:web": "npm --workspace apps/web run typecheck"
   }

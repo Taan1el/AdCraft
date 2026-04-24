@@ -1,0 +1,9 @@
+name = "adcraft-ai"
+main = "src/index.ts"
+compatibility_date = "2026-04-16"
+
+[vars]
+# Comma-separated list of allowed Origins for CORS.
+# Default keeps GitHub Pages working out of the box.
+ALLOWED_ORIGINS = "https://taan1el.github.io,http://127.0.0.1:3002,http://localhost:3002"
+

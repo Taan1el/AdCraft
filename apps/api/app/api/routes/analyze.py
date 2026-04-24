@@ -29,13 +29,24 @@ async def analyze(request: Request) -> JSONResponse:
     contents = await upload.read()  # type: ignore[attr-defined]
     image = Image.open(io.BytesIO(contents)).convert("RGB")
 
+    if not settings.mock_analysis and not settings.has_llm_credentials:
+        return JSONResponse(
+            {
+                "error": (
+                    "AI analysis is enabled (MOCK_ANALYSIS=false) but no LLM credentials are set. "
+                    "Set GEMINI_API_KEY or OPENAI_API_KEY, or set MOCK_ANALYSIS=true for "
+                    "deterministic-only analysis without an API key."
+                )
+            },
+            status_code=503,
+        )
+
     result = run_analysis(
         image=image,
         ad_type=ad_type,
         campaign_goal=str(form.get("campaignGoal") or "") or None,
         audience=str(form.get("audience") or "") or None,
         brand_name=str(form.get("brandName") or "") or None,
-        force_mock=settings.mock_analysis or not settings.openai_api_key,
     )
     return JSONResponse(result)
 
