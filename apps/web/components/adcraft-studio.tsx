@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 
-import { analyzeCreative } from "@/lib/api";
+import { analyzeCreative, DEMO_MODE } from "@/lib/api";
 import { AdType, AnalysisResponse, CategoryScores } from "@/lib/types";
 
 const AD_TYPES: Array<{
@@ -128,6 +128,12 @@ export function AdCraftStudio() {
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[var(--color-paper)] text-[var(--color-ink)]">
+      {DEMO_MODE ? (
+        <div className="relative z-10 flex items-center justify-center gap-3 bg-[var(--color-accent)] px-4 py-2.5 text-center text-sm font-semibold text-[var(--color-accent-ink)]">
+          <span className="inline-block h-2 w-2 rounded-full bg-[var(--color-accent-ink)] opacity-70" />
+          Demo mode — scores and annotations are illustrative. Run the API locally for live analysis.
+        </div>
+      ) : null}
       <div className="studio-grid pointer-events-none absolute inset-0 opacity-60" />
       <div className="studio-noise pointer-events-none absolute inset-0 opacity-35" />
 
