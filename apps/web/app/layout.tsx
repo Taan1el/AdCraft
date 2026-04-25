@@ -187,8 +187,11 @@ const css = `
     color: var(--text); margin-bottom: 32px;
   }
 
-  .results-wrap { max-width: 1160px; margin: 0 auto; padding: 40px 32px 80px; }
-  .results-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 40px; gap: 20px; }
+  .results-wrap { max-width: 1160px; margin: 0 auto; padding: 60px 32px 40px; scroll-margin-top: 80px; }
+  .results-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 32px; gap: 20px; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spin { animation: spin 0.8s linear infinite; transform-origin: center; }
 
   @media (max-width: 900px) {
     .hero { grid-template-columns: 1fr; gap: 40px; padding: 100px 24px 60px; }
