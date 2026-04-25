@@ -1,304 +1,455 @@
-import type { AnalyzeInput } from "@/lib/analyze-input";
-import type { AnalysisResponse, Annotation, CategoryScores, Issue, Recommendation } from "@/lib/types";
+// Browser-based heuristic ad analyzer.
+// Runs client-side using the Canvas API. No model, no API key — just measurements
+// from the actual pixels: whitespace, edge density (Sobel), contrast between dominant
+// colors, and a rough saliency proxy for the CTA region.
+//
+// This produces honest, deterministic scores. It's not as smart as an LLM critique,
+// but the numbers actually mean something.
 
-function clamp01(x: number): number {
-  return Math.max(0, Math.min(1, x));
-}
+import type {
+  AdType,
+  AnalysisResponse,
+  CategoryScores,
+  Issue,
+  Recommendation,
+} from "@adcraft/shared-types";
 
-function medianGray(gray: Uint8Array): number {
-  const hist = new Uint32Array(256);
-  for (let i = 0; i < gray.length; i++) hist[gray[i]]++;
-  const half = gray.length / 2;
-  let c = 0;
-  for (let v = 0; v < 256; v++) {
-    c += hist[v];
-    if (c >= half) return v;
+type RGB = { r: number; g: number; b: number };
+
+type Metrics = {
+  whitespaceRatio: number;
+  visualDensity: number;
+  contrastScore: number;
+  ctaSaliencyScore: number;
+  width: number;
+  height: number;
+  aspectRatio: number;
+  brightnessMean: number;
+  brightnessStd: number;
+  paletteSize: number;
+  topRegionDensity: number;
+  bottomRegionDensity: number;
+};
+
+const MAX_DIM = 800; // downsample large uploads — keeps Sobel fast
+
+async function loadImage(file: File): Promise<HTMLImageElement> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.decoding = "async";
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("Could not decode image"));
+      img.src = url;
+    });
+    return img;
+  } finally {
+    // revoke after the image has actually loaded into memory
+    setTimeout(() => URL.revokeObjectURL(url), 0);
   }
-  return 0;
 }
 
-function pstdev(gray: Uint8Array): number {
-  if (gray.length <= 1) return 0;
-  let s = 0;
-  for (let i = 0; i < gray.length; i++) s += gray[i];
-  const m = s / gray.length;
-  let v = 0;
-  for (let i = 0; i < gray.length; i++) {
-    const d = gray[i] - m;
-    v += d * d;
-  }
-  return Math.sqrt(v / gray.length);
-}
-
-function idx(x: number, y: number, w: number): number {
-  return y * w + x;
-}
-
-async function grayFromFile(
-  file: File,
-  maxSide: number,
-): Promise<{ origW: number; origH: number; w: number; h: number; gray: Uint8Array }> {
-  const bmp = await createImageBitmap(file);
-  const origW = bmp.width;
-  const origH = bmp.height;
-  const scale = Math.min(1, maxSide / Math.max(origW, origH));
-  const w = Math.max(1, Math.round(origW * scale));
-  const h = Math.max(1, Math.round(origH * scale));
+function drawToCanvas(img: HTMLImageElement): { data: ImageData; width: number; height: number } {
+  const scale = Math.min(1, MAX_DIM / Math.max(img.naturalWidth, img.naturalHeight));
+  const w = Math.max(1, Math.round(img.naturalWidth * scale));
+  const h = Math.max(1, Math.round(img.naturalHeight * scale));
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  if (!ctx) throw new Error("Canvas not available");
-  ctx.drawImage(bmp, 0, 0, w, h);
-  bmp.close();
-  const data = ctx.getImageData(0, 0, w, h).data;
-  const gray = new Uint8Array(w * h);
-  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
-    gray[p] = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
-  }
-  return { origW, origH, w, h, gray };
+  if (!ctx) throw new Error("Canvas 2D context unavailable");
+  ctx.drawImage(img, 0, 0, w, h);
+  return { data: ctx.getImageData(0, 0, w, h), width: w, height: h };
 }
 
-function computeMetrics(gray: Uint8Array, w: number, h: number) {
-  const n = gray.length;
-  const med = medianGray(gray);
-  let nearMed = 0;
-  for (let i = 0; i < n; i++) {
-    if (Math.abs(gray[i] - med) < 10) nearMed++;
+// WCAG relative luminance
+function luminance({ r, g, b }: RGB): number {
+  const f = (c: number) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+}
+
+function contrastRatio(a: RGB, b: RGB): number {
+  const la = luminance(a);
+  const lb = luminance(b);
+  const [hi, lo] = la > lb ? [la, lb] : [lb, la];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+// quantize to a small palette by snapping each channel to 32-step buckets
+function dominantPalette(d: ImageData, topN = 5): { color: RGB; count: number }[] {
+  const counts = new Map<number, number>();
+  const px = d.data;
+  for (let i = 0; i < px.length; i += 16) {
+    // sample every 4th pixel — fast enough and the palette barely changes
+    const r = px[i] & 0xe0;
+    const g = px[i + 1] & 0xe0;
+    const b = px[i + 2] & 0xe0;
+    const key = (r << 16) | (g << 8) | b;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
   }
-  const whitespaceRatio = clamp01(nearMed / n);
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, topN)
+    .map(([key, count]) => ({
+      color: { r: (key >> 16) & 0xff, g: (key >> 8) & 0xff, b: key & 0xff },
+      count,
+    }));
+}
 
-  const stdev = pstdev(gray);
-  const contrastScore = clamp01(stdev / 64);
-
-  const thr = 18;
-  let edgeLike = 0;
-  let total = 0;
-  for (let y = 0; y < h - 1; y++) {
-    for (let x = 0; x < w - 1; x++) {
-      const p = gray[idx(x, y, w)];
-      const dx = Math.abs(gray[idx(x + 1, y, w)] - p);
-      const dy = Math.abs(gray[idx(x, y + 1, w)] - p);
-      if (dx + dy >= thr) edgeLike++;
-      total++;
-    }
+function sobelEdgeRatio(d: ImageData): { ratio: number; topRatio: number; bottomRatio: number } {
+  const { width: w, height: h, data } = d;
+  // grayscale buffer
+  const gray = new Uint8ClampedArray(w * h);
+  for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+    gray[j] = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) | 0;
   }
-  const visualDensity = clamp01(edgeLike / Math.max(1, total));
-
-  const gridY = 10;
-  const gridX = 10;
-  const cellH = Math.max(1, Math.floor(h / gridY));
-  const cellW = Math.max(1, Math.floor(w / gridX));
-
-  let bestCta = 0;
-  let ctaBox = { x0: 0, y0: 0, bw: cellW, bh: cellH };
-  let bestClutter = 0;
-  let clutterBox = ctaBox;
-
-  for (let gy = 0; gy < gridY; gy++) {
-    for (let gx = 0; gx < gridX; gx++) {
-      const y0 = gy * cellH;
-      const x0 = gx * cellW;
-      const y1 = Math.min(h, y0 + cellH);
-      const x1 = Math.min(w, x0 + cellW);
-
-      const patch: number[] = [];
-      const sy = Math.max(1, Math.floor((y1 - y0) / 12));
-      const sx = Math.max(1, Math.floor((x1 - x0) / 12));
-      for (let yy = y0; yy < y1; yy += sy) {
-        for (let xx = x0; xx < x1; xx += sx) {
-          patch.push(gray[idx(xx, yy, w)]);
-        }
-      }
-      if (patch.length >= 16) {
-        const u8 = Uint8Array.from(patch);
-        const localStd = pstdev(u8);
-        const local = localStd / 64;
-        const cy = (y0 + y1) / 2 / h;
-        const cx = (x0 + x1) / 2 / w;
-        const bias = (1 - Math.abs(cx - 0.5)) * (1 - Math.abs(cy - 0.7));
-        const score = local * Math.max(0.2, bias);
-        if (score > bestCta) {
-          bestCta = score;
-          ctaBox = { x0, y0, bw: x1 - x0, bh: y1 - y0 };
-        }
-      }
-
-      let edgeLocal = 0;
-      let totalLocal = 0;
-      const sy2 = Math.max(1, Math.floor((y1 - y0) / 10));
-      const sx2 = Math.max(1, Math.floor((x1 - x0) / 10));
-      for (let yy = y0; yy < y1 - 1; yy += sy2) {
-        for (let xx = x0; xx < x1 - 1; xx += sx2) {
-          const p = gray[idx(xx, yy, w)];
-          const dx = Math.abs(gray[idx(xx + 1, yy, w)] - p);
-          const dy = Math.abs(gray[idx(xx, yy + 1, w)] - p);
-          if (dx + dy >= thr) edgeLocal++;
-          totalLocal++;
-        }
-      }
-      if (totalLocal >= 12) {
-        const dens = edgeLocal / totalLocal;
-        if (dens > bestClutter) {
-          bestClutter = dens;
-          clutterBox = { x0, y0, bw: x1 - x0, bh: y1 - y0 };
-        }
+  let edges = 0;
+  let topEdges = 0;
+  let bottomEdges = 0;
+  const halfH = h >> 1;
+  // 3x3 Sobel
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      const gx =
+        -gray[i - w - 1] - 2 * gray[i - 1] - gray[i + w - 1] +
+        gray[i - w + 1] + 2 * gray[i + 1] + gray[i + w + 1];
+      const gy =
+        -gray[i - w - 1] - 2 * gray[i - w] - gray[i - w + 1] +
+        gray[i + w - 1] + 2 * gray[i + w] + gray[i + w + 1];
+      const mag = Math.abs(gx) + Math.abs(gy);
+      if (mag > 80) {
+        edges++;
+        if (y < halfH) topEdges++;
+        else bottomEdges++;
       }
     }
   }
-
-  const ctaSaliencyScore = clamp01(bestCta * 1.2);
-
-  const annotations: Annotation[] = [
-    {
-      id: "ann_cta_candidate",
-      type: "box",
-      label: "CTA candidate area",
-      x: clamp01(ctaBox.x0 / w),
-      y: clamp01(ctaBox.y0 / h),
-      w: clamp01(ctaBox.bw / w),
-      h: clamp01(ctaBox.bh / h),
-    },
-    {
-      id: "ann_clutter",
-      type: "box",
-      label: "High visual density",
-      x: clamp01(clutterBox.x0 / w),
-      y: clamp01(clutterBox.y0 / h),
-      w: clamp01(clutterBox.bw / w),
-      h: clamp01(clutterBox.bh / h),
-    },
-  ];
-
-  if (contrastScore < 0.45) {
-    annotations.push({
-      id: "ann_low_contrast",
-      type: "box",
-      label: "Possible low-contrast text area",
-      x: 0.06,
-      y: 0.06,
-      w: 0.88,
-      h: 0.24,
-    });
-  }
-
+  const total = (w - 2) * (h - 2);
+  const halfTotal = total / 2;
   return {
-    metrics: {
-      whitespaceRatio,
-      visualDensity: visualDensity,
-      contrastScore,
-      ctaSaliencyScore,
-    },
-    annotations,
+    ratio: edges / total,
+    topRatio: topEdges / halfTotal,
+    bottomRatio: bottomEdges / halfTotal,
   };
 }
 
-function categoryFromMetrics(m: AnalysisResponse["metrics"]): CategoryScores {
+function measureBrightness(d: ImageData): { mean: number; std: number; whitespace: number } {
+  const px = d.data;
+  let sum = 0;
+  let sumSq = 0;
+  let bright = 0;
+  let n = 0;
+  for (let i = 0; i < px.length; i += 4) {
+    const v = (px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114) / 255;
+    sum += v;
+    sumSq += v * v;
+    if (v > 0.92) bright++;
+    n++;
+  }
+  const mean = sum / n;
+  const variance = Math.max(0, sumSq / n - mean * mean);
+  return { mean, std: Math.sqrt(variance), whitespace: bright / n };
+}
+
+// rough CTA saliency: how strongly the bottom third "pops" via saturated color + edges
+function ctaSaliency(d: ImageData): number {
+  const { width: w, height: h, data } = d;
+  const yStart = Math.floor(h * 0.6);
+  let satSum = 0;
+  let n = 0;
+  for (let y = yStart; y < h; y++) {
+    for (let x = 0; x < w; x += 2) {
+      const i = (y * w + x) * 4;
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const sat = max === 0 ? 0 : (max - min) / max;
+      satSum += sat;
+      n++;
+    }
+  }
+  return n === 0 ? 0 : satSum / n;
+}
+
+function clamp(n: number, lo = 0, hi = 100): number {
+  return Math.max(lo, Math.min(hi, n));
+}
+
+function scoreFromTarget(value: number, idealMin: number, idealMax: number, falloff: number): number {
+  if (value >= idealMin && value <= idealMax) return 100;
+  const dist = value < idealMin ? idealMin - value : value - idealMax;
+  return clamp(100 - (dist / falloff) * 100);
+}
+
+function aspectScore(adType: AdType, ratio: number): number {
+  // ideal ratio per ad slot. Falloff is loose — we don't penalize hard.
+  const targets: Record<AdType, [number, number]> = {
+    display_ad: [1.5, 1.95],   // ~1.91:1 (Meta feed) or wider
+    landing_hero: [1.6, 2.4],
+    email_hero: [1.8, 3.5],
+    social_ad: [0.8, 1.25],     // square-ish
+  };
+  const [lo, hi] = targets[adType];
+  return scoreFromTarget(ratio, lo, hi, 1.0);
+}
+
+async function computeMetrics(file: File): Promise<Metrics> {
+  const img = await loadImage(file);
+  const { data, width, height } = drawToCanvas(img);
+
+  const { mean, std, whitespace } = measureBrightness(data);
+  const { ratio: density, topRatio, bottomRatio } = sobelEdgeRatio(data);
+  const palette = dominantPalette(data, 5);
+
+  // contrast = best contrast among the top-2 dominant colors
+  let contrast = 1;
+  if (palette.length >= 2) {
+    contrast = contrastRatio(palette[0].color, palette[1].color);
+    for (let i = 0; i < palette.length; i++) {
+      for (let j = i + 1; j < palette.length; j++) {
+        const c = contrastRatio(palette[i].color, palette[j].color);
+        if (c > contrast) contrast = c;
+      }
+    }
+  }
+
   return {
-    visualHierarchy: Math.round(Math.max(0, Math.min(100, 55 + 45 * (1 - m.visualDensity)))),
-    ctaProminence: Math.round(Math.max(0, Math.min(100, 40 + 60 * m.ctaSaliencyScore))),
-    copyClarity: 72,
-    readability: Math.round(Math.max(0, Math.min(100, 45 + 55 * m.contrastScore))),
-    layoutBalance: 70,
-    trustSignals: 65,
+    whitespaceRatio: whitespace,
+    visualDensity: density,
+    contrastScore: contrast,
+    ctaSaliencyScore: ctaSaliency(data),
+    width,
+    height,
+    aspectRatio: width / Math.max(1, height),
+    brightnessMean: mean,
+    brightnessStd: std,
+    paletteSize: palette.length,
+    topRegionDensity: topRatio,
+    bottomRegionDensity: bottomRatio,
   };
 }
 
-function overallFromMetrics(m: AnalysisResponse["metrics"]): number {
-  const raw =
-    100 *
-    (0.25 * m.contrastScore +
-      0.25 * (1 - m.visualDensity) +
-      0.25 * m.whitespaceRatio +
-      0.25 * m.ctaSaliencyScore);
-  return Math.round(Math.max(0, Math.min(100, raw)));
+function deriveScores(m: Metrics, adType: AdType): CategoryScores {
+  // visual hierarchy: top-vs-bottom density imbalance is good (means there's a focal area)
+  const hierarchyDelta = Math.abs(m.topRegionDensity - m.bottomRegionDensity);
+  const visualHierarchy = clamp(40 + hierarchyDelta * 600 + m.brightnessStd * 80);
+
+  // CTA prominence: saliency in lower region + reasonable contrast
+  const contrastNorm = Math.min(1, m.contrastScore / 7); // 7:1 = AAA
+  const ctaProminence = clamp(40 + m.ctaSaliencyScore * 70 + contrastNorm * 30);
+
+  // copy clarity: hard to measure without OCR. Proxy: moderate density + high contrast + not cluttered.
+  const densityPenalty = m.visualDensity > 0.18 ? (m.visualDensity - 0.18) * 300 : 0;
+  const copyClarity = clamp(50 + contrastNorm * 50 - densityPenalty);
+
+  // readability: WCAG contrast ratio is the primary driver.
+  // 4.5:1 = AA body, 7:1 = AAA. <3:1 fails.
+  let readability: number;
+  if (m.contrastScore >= 7) readability = 95;
+  else if (m.contrastScore >= 4.5) readability = 80;
+  else if (m.contrastScore >= 3) readability = 60;
+  else readability = clamp(20 + m.contrastScore * 10);
+
+  // layout balance: whitespace in a healthy band + aspect ratio match
+  const wsScore = scoreFromTarget(m.whitespaceRatio, 0.15, 0.45, 0.4);
+  const aspect = aspectScore(adType, m.aspectRatio);
+  const layoutBalance = clamp(wsScore * 0.6 + aspect * 0.4);
+
+  // trust signals: hard without OCR. Proxy: moderate palette + balanced brightness (extreme = sketchy).
+  const brightnessFit = scoreFromTarget(m.brightnessMean, 0.3, 0.75, 0.5);
+  const trustSignals = clamp(50 + brightnessFit * 0.4 + (m.contrastScore >= 4.5 ? 15 : 0));
+
+  return {
+    visualHierarchy: Math.round(visualHierarchy),
+    ctaProminence: Math.round(ctaProminence),
+    copyClarity: Math.round(copyClarity),
+    readability: Math.round(readability),
+    layoutBalance: Math.round(layoutBalance),
+    trustSignals: Math.round(trustSignals),
+  };
 }
 
-function buildIssuesAndRecs(m: AnalysisResponse["metrics"]): { issues: Issue[]; recommendations: Recommendation[] } {
-  const issues: Issue[] = [];
-  const recs: Recommendation[] = [];
+function buildIssues(m: Metrics, scores: CategoryScores): Issue[] {
+  const out: Issue[] = [];
 
-  if (m.contrastScore < 0.45) {
-    issues.push({
-      id: "issue_contrast_low",
+  if (m.contrastScore < 4.5) {
+    out.push({
+      id: "contrast-low",
       category: "readability",
-      severity: "high",
-      title: "Low contrast",
-      description: "Large flat regions or weak separation between text and background.",
-    });
-    recs.push({
-      id: "rec_increase_contrast",
-      category: "readability",
-      priority: "high",
-      title: "Boost contrast on key text",
-      action: "Darken text or lighten the area behind it so the headline and CTA read clearly on mobile.",
+      severity: m.contrastScore < 3 ? "high" : "medium",
+      title: `Contrast ratio is only ${m.contrastScore.toFixed(1)}:1`,
+      description:
+        "WCAG AA requires at least 4.5:1 for body text. Low contrast hurts comprehension and accessibility — especially on small mobile screens.",
     });
   }
 
-  if (m.ctaSaliencyScore < 0.5) {
-    issues.push({
-      id: "issue_cta_weak",
-      category: "ctaProminence",
-      severity: "high",
-      title: "CTA does not stand out",
-      description: "Nothing in the lower area reads like a dominant action.",
+  if (m.whitespaceRatio < 0.1) {
+    out.push({
+      id: "whitespace-low",
+      category: "layoutBalance",
+      severity: "medium",
+      title: "Layout looks crowded",
+      description: `Only ${(m.whitespaceRatio * 100).toFixed(0)}% of the canvas reads as breathing room. Cluttered creatives lose viewers in the first second of scroll.`,
     });
-    recs.push({
-      id: "rec_cta_separation",
-      category: "ctaProminence",
-      priority: "high",
-      title: "Give the CTA more weight",
-      action: "Increase size/contrast and add whitespace so the button is the obvious next click.",
+  } else if (m.whitespaceRatio > 0.6) {
+    out.push({
+      id: "whitespace-high",
+      category: "layoutBalance",
+      severity: "low",
+      title: "Lots of empty space",
+      description: "Could indicate an underused canvas — consider whether the focal area earns its scale.",
     });
   }
 
-  if (m.visualDensity > 0.55) {
-    issues.push({
-      id: "issue_density",
+  if (m.visualDensity > 0.22) {
+    out.push({
+      id: "density-high",
       category: "visualHierarchy",
       severity: "medium",
-      title: "Busy layout",
-      description: "Lots of edges packed together — hierarchy gets noisy fast.",
-    });
-    recs.push({
-      id: "rec_simplify",
-      category: "visualHierarchy",
-      priority: "medium",
-      title: "Remove one secondary element",
-      action: "Pick a single focal point; demote extras with smaller type or lower contrast.",
+      title: "Visual density is high",
+      description:
+        "Edge density is well above the comfortable range. Too many competing elements blur the focal point — viewers don't know where to look.",
     });
   }
 
-  return { issues: issues, recommendations: recs };
+  if (scores.ctaProminence < 60) {
+    out.push({
+      id: "cta-weak",
+      category: "ctaProminence",
+      severity: "high",
+      title: "CTA doesn't pop",
+      description:
+        "The lower region lacks the color saturation and contrast that make a button feel clickable. Try a high-contrast accent color reserved exclusively for the CTA.",
+    });
+  }
+
+  if (Math.abs(m.topRegionDensity - m.bottomRegionDensity) < 0.02) {
+    out.push({
+      id: "hierarchy-flat",
+      category: "visualHierarchy",
+      severity: "medium",
+      title: "No clear focal area",
+      description:
+        "Top and bottom halves carry roughly equal visual weight, so the eye has nowhere to land first. Strong creatives have an obvious hero element.",
+    });
+  }
+
+  return out;
 }
 
-function newId(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
-  return `local-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+function buildRecommendations(m: Metrics, scores: CategoryScores): Recommendation[] {
+  const out: Recommendation[] = [];
+
+  if (m.contrastScore < 7) {
+    out.push({
+      id: "boost-contrast",
+      category: "readability",
+      priority: m.contrastScore < 4.5 ? "high" : "medium",
+      title: "Increase text-to-background contrast",
+      action:
+        "Aim for 7:1 (WCAG AAA) on headlines. Darken the background behind text, or add a subtle scrim if the photo is busy.",
+    });
+  }
+
+  if (scores.ctaProminence < 75) {
+    out.push({
+      id: "stronger-cta",
+      category: "ctaProminence",
+      priority: "high",
+      title: "Make the CTA the brightest thing in the lower half",
+      action:
+        "Use one accent color reserved only for the button. Increase the button height by 15–20% and add a clear action verb ('Start free trial', 'Get the report').",
+    });
+  }
+
+  if (m.visualDensity > 0.18) {
+    out.push({
+      id: "reduce-clutter",
+      category: "visualHierarchy",
+      priority: "medium",
+      title: "Cut secondary elements",
+      action:
+        "Try removing 1–2 visual elements. The clearest ads usually have a single hero image, a 5-9 word headline, and the CTA — nothing else competing.",
+    });
+  }
+
+  if (m.whitespaceRatio < 0.15) {
+    out.push({
+      id: "add-padding",
+      category: "layoutBalance",
+      priority: "medium",
+      title: "Add breathing room",
+      action: "Increase padding around the headline and CTA. Negative space is what makes the focal element feel important.",
+    });
+  }
+
+  if (out.length === 0) {
+    out.push({
+      id: "ab-test",
+      category: "ctaProminence",
+      priority: "low",
+      title: "Run an A/B test on the headline",
+      action:
+        "Scores look healthy. The next biggest lift usually comes from copy testing — try two distinct value-prop angles against your current headline.",
+    });
+  }
+
+  return out;
 }
 
-export async function analyzeWithHeuristics(input: AnalyzeInput): Promise<AnalysisResponse> {
-  const { origW, origH, w, h, gray } = await grayFromFile(input.file, 320);
-  const { metrics, annotations } = computeMetrics(gray, w, h);
-  const categoryScores = categoryFromMetrics(metrics);
-  const overallScore = overallFromMetrics(metrics);
-  const { issues, recommendations } = buildIssuesAndRecs(metrics);
+function buildSummary(scores: CategoryScores, overall: number): string {
+  const weakest = (Object.entries(scores) as [keyof CategoryScores, number][])
+    .sort((a, b) => a[1] - b[1])[0];
+  const niceName: Record<keyof CategoryScores, string> = {
+    visualHierarchy: "visual hierarchy",
+    ctaProminence: "CTA prominence",
+    copyClarity: "copy clarity",
+    readability: "readability",
+    layoutBalance: "layout balance",
+    trustSignals: "trust signals",
+  };
+  const tier = overall >= 80 ? "strong" : overall >= 65 ? "decent" : overall >= 50 ? "mixed" : "weak";
+  return `Heuristic analysis: ${tier} overall (${overall}/100). The biggest opportunity is ${niceName[weakest[0]]} at ${weakest[1]}/100. Scores derive from contrast, edge density, whitespace, and CTA-region saliency measured directly from the pixels — no AI critique was used.`;
+}
 
-  const ctxBits = [input.campaignGoal, input.audience, input.brandName].filter(Boolean).join(" · ");
-  const summary =
-    `Local scan (no API): heuristic scores from the image pixels (${input.adType.replace(/_/g, " ")}). ` +
-    (ctxBits ? `Context you entered: ${ctxBits}. ` : "") +
-    "Hook up the backend + an LLM key when you want deeper copy critique.";
+export async function analyzeLocally(
+  file: File,
+  adType: AdType,
+): Promise<AnalysisResponse> {
+  const m = await computeMetrics(file);
+  const scores = deriveScores(m, adType);
+
+  const overall = Math.round(
+    scores.visualHierarchy * 0.18 +
+      scores.ctaProminence * 0.22 +
+      scores.copyClarity * 0.15 +
+      scores.readability * 0.20 +
+      scores.layoutBalance * 0.15 +
+      scores.trustSignals * 0.10,
+  );
+
+  const issues = buildIssues(m, scores);
+  const recommendations = buildRecommendations(m, scores);
 
   return {
-    analysisId: newId(),
-    image: { width: origW, height: origH },
-    overallScore,
-    summary,
-    categoryScores,
+    analysisId: `local-${Date.now().toString(36)}`,
+    image: { width: m.width, height: m.height },
+    overallScore: overall,
+    summary: buildSummary(scores, overall),
+    categoryScores: scores,
     issues,
     recommendations,
-    annotations,
-    metrics,
+    annotations: [],
+    metrics: {
+      whitespaceRatio: Number(m.whitespaceRatio.toFixed(3)),
+      visualDensity: Number(m.visualDensity.toFixed(3)),
+      contrastScore: Number(m.contrastScore.toFixed(2)),
+      ctaSaliencyScore: Number(m.ctaSaliencyScore.toFixed(3)),
+    },
   };
 }

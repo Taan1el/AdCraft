@@ -1,16 +1,23 @@
-import type { AnalyzeInput } from "@/lib/analyze-input";
-import { analyzeWithHeuristics } from "@/lib/heuristics";
-import type { AnalysisResponse } from "@/lib/types";
+import type { AdType, AnalysisResponse } from "@/lib/types";
+import { analyzeLocally } from "@/lib/heuristics";
 
-export type { AnalyzeInput };
+export type AnalyzeInput = {
+  file: File;
+  adType: AdType;
+  campaignGoal?: string;
+  audience?: string;
+  brandName?: string;
+};
 
-const LOCAL_DEADLINE_MS = 8000;
-
-function apiBase(): string {
-  return (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8010").replace(/\/$/, "");
+function apiBase(): string | null {
+  // explicit empty string disables the backend and forces local heuristic mode
+  const v = process.env.NEXT_PUBLIC_API_URL;
+  if (v === "") return null;
+  const b = (v || "http://127.0.0.1:8010").trim().replace(/\/$/, "");
+  return b;
 }
 
-export async function analyzeCreative(input: AnalyzeInput): Promise<AnalysisResponse> {
+async function tryRemote(base: string, input: AnalyzeInput): Promise<AnalysisResponse> {
   const fd = new FormData();
   fd.set("file", input.file);
   fd.set("adType", input.adType);
@@ -18,23 +25,29 @@ export async function analyzeCreative(input: AnalyzeInput): Promise<AnalysisResp
   if (input.audience) fd.set("audience", input.audience);
   if (input.brandName) fd.set("brandName", input.brandName);
 
-  const endpoint = `${apiBase()}/analyze`;
+  // short timeout — if the API isn't reachable we fall back to local rather than hang
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), LOCAL_DEADLINE_MS);
+  const t = setTimeout(() => ctrl.abort(), 2500);
   try {
-    const response = await fetch(endpoint, { method: "POST", body: fd, signal: ctrl.signal });
-    if (response.ok) {
-      try {
-        return (await response.json()) as AnalysisResponse;
-      } catch {
-        return analyzeWithHeuristics(input);
-      }
+    const res = await fetch(`${base}/analyze`, { method: "POST", body: fd, signal: ctrl.signal });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`Analyze failed (${res.status}): ${text || res.statusText}`);
     }
-  } catch {
-    // offline, CORS, DNS, timeout, etc.
+    return (await res.json()) as AnalysisResponse;
   } finally {
-    clearTimeout(timer);
+    clearTimeout(t);
   }
+}
 
-  return analyzeWithHeuristics(input);
+export async function analyzeCreative(input: AnalyzeInput): Promise<AnalysisResponse> {
+  const base = apiBase();
+  if (base) {
+    try {
+      return await tryRemote(base, input);
+    } catch {
+      // backend unreachable or errored — drop to local engine
+    }
+  }
+  return analyzeLocally(input.file, input.adType);
 }
