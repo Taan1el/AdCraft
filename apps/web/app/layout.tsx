@@ -201,6 +201,7 @@ const css = `
     .score-section { grid-template-columns: 1fr; gap: 48px; }
     .report-top { grid-template-columns: 1fr; gap: 16px; }
     .results-header { flex-direction: column; }
+    .results-preview { grid-template-columns: 1fr !important; }
   }
   @media (max-width: 600px) {
     .features-grid { grid-template-columns: 1fr; }

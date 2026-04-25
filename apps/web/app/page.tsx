@@ -61,6 +61,14 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResponse | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // Revoke any previous preview URL when it changes or on unmount — prevents leaks.
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   const runAnalysis = useCallback(async (f: File) => {
     setLoading(true);
@@ -80,6 +88,10 @@ export default function Home() {
   // Wrapping the setter ensures both code paths kick analysis off without an extra button.
   const acceptFile = useCallback((f: File) => {
     setFile(f);
+    setPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(f);
+    });
     void runAnalysis(f);
   }, [runAnalysis]);
 
@@ -87,6 +99,10 @@ export default function Home() {
     setFile(null);
     setResult(null);
     setError(null);
+    setPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
     if (fileInputRef.current) fileInputRef.current.value = ""; // allow re-picking the same file
   }, []);
 
@@ -212,7 +228,7 @@ export default function Home() {
               <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Reading pixels, computing contrast and density</div>
             </div>
           ) : result ? (
-            <AnalysisResultsInline result={result} onReset={reset} />
+            <AnalysisResultsInline result={result} previewUrl={previewUrl} fileName={file?.name} onReset={reset} />
           ) : error ? (
             <div style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 12, padding: 20 }}>
               <div style={{ fontSize: "0.9rem", fontWeight: 700, color: "#f87171", marginBottom: 4 }}>Analysis failed</div>
@@ -385,7 +401,7 @@ export default function Home() {
   );
 }
 
-function AnalysisResultsInline({ result, onReset }: { result: AnalysisResponse; onReset: () => void }) {
+function AnalysisResultsInline({ result, previewUrl, fileName, onReset }: { result: AnalysisResponse; previewUrl: string | null; fileName?: string; onReset: () => void }) {
   const cats = [
     { label: "Visual hierarchy", key: "visualHierarchy" },
     { label: "CTA prominence", key: "ctaProminence" },
@@ -410,6 +426,40 @@ function AnalysisResultsInline({ result, onReset }: { result: AnalysisResponse; 
           <button type="button" onClick={onReset} className="btn btn-blue">Analyze Another</button>
         </div>
       </div>
+
+      {previewUrl ? (
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 360px) 1fr", gap: 24, marginBottom: 32, alignItems: "start" }} className="results-preview">
+          <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: 12 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={previewUrl}
+              alt={fileName ?? "Uploaded creative"}
+              style={{ display: "block", width: "100%", height: "auto", borderRadius: 8, background: "#000" }}
+            />
+            {fileName ? (
+              <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginTop: 10, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {fileName} · {result.image.width}×{result.image.height}
+              </div>
+            ) : null}
+          </div>
+          <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px" }}>
+            <div style={{ fontSize: "0.72rem", fontWeight: 600, color: "var(--text-muted)", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 12 }}>Pixel metrics</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+              {[
+                ["Whitespace", `${Math.round(result.metrics.whitespaceRatio * 100)}%`],
+                ["Visual density", `${Math.round(result.metrics.visualDensity * 100)}%`],
+                ["Contrast", `${result.metrics.contrastScore.toFixed(1)}:1`],
+                ["CTA saliency", `${Math.round(result.metrics.ctaSaliencyScore * 100)}%`],
+              ].map(([label, val]) => (
+                <div key={label} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 8, padding: "10px 12px" }}>
+                  <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", letterSpacing: "0.04em", marginBottom: 4 }}>{label}</div>
+                  <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--text)" }}>{val}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: 10, marginBottom: 32 }}>
         {cats.map(({ label, key }) => {
