@@ -1,15 +1,13 @@
-import type { AdType, AnalysisResponse } from "@/lib/types";
+import type { AnalyzeInput } from "@/lib/analyze-input";
+import { analyzeWithHeuristics } from "@/lib/heuristics";
+import type { AnalysisResponse } from "@/lib/types";
 
-export type AnalyzeInput = {
-  file: File;
-  adType: AdType;
-  campaignGoal?: string;
-  audience?: string;
-  brandName?: string;
-};
+export type { AnalyzeInput };
+
+const LOCAL_DEADLINE_MS = 8000;
 
 function apiBase(): string {
-  return process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8010";
+  return (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8010").replace(/\/$/, "");
 }
 
 export async function analyzeCreative(input: AnalyzeInput): Promise<AnalysisResponse> {
@@ -20,16 +18,23 @@ export async function analyzeCreative(input: AnalyzeInput): Promise<AnalysisResp
   if (input.audience) fd.set("audience", input.audience);
   if (input.brandName) fd.set("brandName", input.brandName);
 
-  const base = apiBase();
-  let res: Response;
+  const endpoint = `${apiBase()}/analyze`;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), LOCAL_DEADLINE_MS);
   try {
-    res = await fetch(`${base}/analyze`, { method: "POST", body: fd });
+    const response = await fetch(endpoint, { method: "POST", body: fd, signal: ctrl.signal });
+    if (response.ok) {
+      try {
+        return (await response.json()) as AnalysisResponse;
+      } catch {
+        return analyzeWithHeuristics(input);
+      }
+    }
   } catch {
-    throw new Error(`Could not reach the API at ${base}. Is the backend running (and is NEXT_PUBLIC_API_URL set)?`);
+    // offline, CORS, DNS, timeout, etc.
+  } finally {
+    clearTimeout(timer);
   }
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Analyze failed (${res.status}): ${text || res.statusText}`);
-  }
-  return (await res.json()) as AnalysisResponse;
+
+  return analyzeWithHeuristics(input);
 }
