@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@adcraft/shared-types": "file:../../packages/shared-types",
+    "@supabase/supabase-js": "^2.45.0",
     "next": "16.2.4",
     "react": "19.2.4",
     "react-dom": "19.2.4"

@@ -1,0 +1,22 @@
+# Render.com deployment config for the FastAPI backend.
+# Render will read this file when you connect the repo and offer to create
+# the service automatically. You only need to set GEMINI_API_KEY in the
+# Render dashboard after the first deploy — never commit the key.
+services:
+  - type: web
+    name: adcraft-api
+    runtime: python
+    rootDir: apps/api
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false                 # paste the key in the Render UI, not in git
+      - key: GEMINI_MODEL
+        value: gemini-flash-latest
+      - key: MOCK_ANALYSIS
+        value: "false"
+      - key: ALLOWED_ORIGINS
+        value: https://taan1el.github.io

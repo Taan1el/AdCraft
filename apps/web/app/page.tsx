@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { analyzeCreative } from "@/lib/api";
 import type { AdType, AnalysisResponse } from "@/lib/types";
+import { AuthMenu } from "@/components/AuthMenu";
+import { useAuth } from "@/lib/auth-context";
+import { saveAnalysis } from "@/lib/history";
 
 const FEATURES = [
   {
@@ -70,6 +73,8 @@ export default function Home() {
     };
   }, [previewUrl]);
 
+  const { user } = useAuth();
+
   const runAnalysis = useCallback(async (f: File) => {
     setLoading(true);
     setError(null);
@@ -77,12 +82,19 @@ export default function Home() {
     try {
       const res = await analyzeCreative({ file: f, adType });
       setResult(res);
+      // If signed in, save to history. Source is "gemini" if the backend ran;
+      // we infer that from analysisId not starting with "local-".
+      if (user) {
+        const source: "local" | "gemini" = res.analysisId.startsWith("local-") ? "local" : "gemini";
+        // intentionally not awaited — saving shouldn't block the UI
+        void saveAnalysis({ file: f, adType, result: res, source });
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Analysis failed");
     } finally {
       setLoading(false);
     }
-  }, [adType]);
+  }, [adType, user]);
 
   // Auto-analyze whenever a file is set (drop, picker, or programmatic).
   // Wrapping the setter ensures both code paths kick analysis off without an extra button.
@@ -140,6 +152,7 @@ export default function Home() {
             ) : (
               <button type="button" className="btn btn-blue" onClick={() => fileInputRef.current?.click()}>Get Started</button>
             )}
+            <AuthMenu />
           </div>
         </div>
       </nav>
