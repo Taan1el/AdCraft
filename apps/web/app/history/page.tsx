@@ -45,13 +45,8 @@ export default function HistoryPage() {
     <>
       <nav>
         <div className="nav-inner">
-          <Link href="./" className="nav-logo">
-            <div className="nav-logo-mark">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M8 2l1.8 4.2H14l-3.6 2.6 1.4 4.2L8 10.6l-3.8 2.4 1.4-4.2L2 6.2h4.2L8 2z" fill="#3b82f6"/>
-              </svg>
-            </div>
-            <span className="nav-logo-text">Ad<span>Craft</span></span>
+          <Link href="./" className="nav-logo" aria-label="AdCraft home">
+            <span className="nav-logo-text" style={{ fontSize: "1.05rem" }}>Ad<span>Craft</span></span>
           </Link>
           <div className="nav-links">
             <Link href="./" className="nav-link">Home</Link>

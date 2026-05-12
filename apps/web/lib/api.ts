@@ -9,12 +9,28 @@ export type AnalyzeInput = {
   brandName?: string;
 };
 
+export type AnalysisSource = "remote" | "local";
+
+export type AnalyzeOutcome = {
+  result: AnalysisResponse;
+  source: AnalysisSource;
+  // true when we attempted the remote backend but had to fall back to local heuristics
+  fellBack: boolean;
+  // explanation when fellBack is true — shown discreetly in the UI
+  fallbackReason?: string;
+};
+
 function apiBase(): string | null {
   // explicit empty string disables the backend and forces local heuristic mode
   const v = process.env.NEXT_PUBLIC_API_URL;
   if (v === "") return null;
   const b = (v || "http://127.0.0.1:8010").trim().replace(/\/$/, "");
   return b;
+}
+
+/** Tells the UI whether a remote call would be attempted at all. */
+export function isRemoteConfigured(): boolean {
+  return apiBase() !== null;
 }
 
 async function tryRemote(base: string, input: AnalyzeInput): Promise<AnalysisResponse> {
@@ -41,14 +57,18 @@ async function tryRemote(base: string, input: AnalyzeInput): Promise<AnalysisRes
   }
 }
 
-export async function analyzeCreative(input: AnalyzeInput): Promise<AnalysisResponse> {
+export async function analyzeCreative(input: AnalyzeInput): Promise<AnalyzeOutcome> {
   const base = apiBase();
   if (base) {
     try {
-      return await tryRemote(base, input);
-    } catch {
-      // backend unreachable or errored — drop to local engine
+      const result = await tryRemote(base, input);
+      return { result, source: "remote", fellBack: false };
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : "Unknown error";
+      const result = await analyzeLocally(input.file, input.adType);
+      return { result, source: "local", fellBack: true, fallbackReason: reason };
     }
   }
-  return analyzeLocally(input.file, input.adType);
+  const result = await analyzeLocally(input.file, input.adType);
+  return { result, source: "local", fellBack: false };
 }
