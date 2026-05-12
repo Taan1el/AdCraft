@@ -25,9 +25,10 @@ async function tryRemote(base: string, input: AnalyzeInput): Promise<AnalysisRes
   if (input.audience) fd.set("audience", input.audience);
   if (input.brandName) fd.set("brandName", input.brandName);
 
-  // short timeout — if the API isn't reachable we fall back to local rather than hang
+  // 30s timeout — enough for Gemini (typically 4-8s) plus cold-start on Render (~25s).
+  // Falls back to local heuristics only if the server is genuinely unreachable.
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 2500);
+  const t = setTimeout(() => ctrl.abort(), 30000);
   try {
     const res = await fetch(`${base}/analyze`, { method: "POST", body: fd, signal: ctrl.signal });
     if (!res.ok) {
