@@ -21,7 +21,9 @@ const css = `
     --blue: #3b82f6;
     --blue-dim: #2563eb;
     --text: #f1f1f3;
-    --text-muted: #6b7280;
+    /* text-muted bumped from #6b7280 (3.5:1, fails WCAG AA) to #9ca3af (6.7:1, passes AAA).
+       Kept text-dim as an alias for backwards-compat; both resolve to the same value now. */
+    --text-muted: #9ca3af;
     --text-dim: #9ca3af;
   }
 
@@ -209,6 +211,20 @@ const css = `
 
   @keyframes spin { to { transform: rotate(360deg); } }
   .spin { animation: spin 0.8s linear infinite; transform-origin: center; }
+
+  /* Accessibility: visible focus rings on every interactive element.
+     We use :focus-visible so mouse clicks don't get the outline,
+     only keyboard navigation. */
+  *:focus { outline: none; }
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  [role="button"]:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  .upload-zone:focus-visible { outline-offset: 4px; }
 
   @media (max-width: 900px) {
     .hero { grid-template-columns: 1fr; gap: 40px; padding: 100px 24px 60px; }

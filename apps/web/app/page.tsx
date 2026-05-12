@@ -194,6 +194,7 @@ export default function Home() {
             dragOver={dragOver}
             loading={loading}
             file={file}
+            previewUrl={previewUrl}
             error={error}
             onPick={() => { if (!loading) fileInputRef.current?.click(); }}
             onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -225,8 +226,19 @@ export default function Home() {
       {showResultsSection ? (
         <section ref={resultsRef} className="results-wrap" style={{ borderTop: "1px solid var(--border)" }}>
           {loading ? (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: "60px 0" }}>
-              <Spinner size={40} />
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 18, padding: "40px 0 60px" }}>
+              {previewUrl ? (
+                <div style={{ position: "relative", width: "100%", maxWidth: 420, aspectRatio: "16/10", borderRadius: 14, overflow: "hidden", background: "#000", border: "1px solid var(--border)" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={previewUrl} alt="" style={{ display: "block", width: "100%", height: "100%", objectFit: "cover", filter: "brightness(0.4)" }} />
+                  <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
+                    <Spinner size={40} />
+                    <div style={{ fontSize: "0.85rem", color: "var(--text)", fontWeight: 600 }}>Analyzing…</div>
+                  </div>
+                </div>
+              ) : (
+                <Spinner size={40} />
+              )}
               <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--text)" }}>Analyzing your creative…</div>
               <div style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>{spinnerLine}</div>
             </div>
@@ -293,11 +305,12 @@ export default function Home() {
 }
 
 function UploadZone({
-  dragOver, loading, file, error, onPick, onDragOver, onDragLeave, onDrop, onRemove,
+  dragOver, loading, file, previewUrl, error, onPick, onDragOver, onDragLeave, onDrop, onRemove,
 }: {
   dragOver: boolean;
   loading: boolean;
   file: File | null;
+  previewUrl: string | null;
   error: string | null;
   onPick: () => void;
   onDragOver: (e: React.DragEvent) => void;
@@ -305,20 +318,45 @@ function UploadZone({
   onDrop: (e: React.DragEvent) => void;
   onRemove: () => void;
 }) {
+  // Keyboard handler for the zone so non-mouse users can open the picker.
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (loading) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onPick();
+    }
+  };
   return (
     <div
       className={`upload-zone${dragOver ? " drag-over" : ""}`}
+      role="button"
+      tabIndex={0}
+      aria-label={file ? `Selected ${file.name}. Press to choose a different file.` : "Upload an ad image"}
       onClick={onPick}
+      onKeyDown={onKeyDown}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
     >
       {loading ? (
-        <>
-          <div className="upload-icon"><Spinner /></div>
-          <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text)" }}>Analyzing…</div>
-          <div style={{ fontSize: "0.78rem", color: "var(--text-dim)" }}>{file?.name}</div>
-        </>
+        // During analysis, keep the thumbnail visible so the user sees what's
+        // being looked at — much less anxiety than a blank spinner.
+        previewUrl ? (
+          <div style={{ position: "relative", width: "100%", maxWidth: 220, aspectRatio: "16/10", borderRadius: 10, overflow: "hidden", background: "#000" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={previewUrl} alt="" style={{ display: "block", width: "100%", height: "100%", objectFit: "cover", filter: "brightness(0.45)" }} />
+            <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              <Spinner size={28} />
+              <div style={{ fontSize: "0.78rem", color: "var(--text)", fontWeight: 600 }}>Analyzing…</div>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="upload-icon"><Spinner /></div>
+            <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text)" }}>Analyzing…</div>
+            <div style={{ fontSize: "0.78rem", color: "var(--text-dim)" }}>{file?.name}</div>
+          </>
+        )
       ) : file ? (
         <>
           <div className="upload-icon">
