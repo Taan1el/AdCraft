@@ -60,6 +60,8 @@ type Env = {
   ALLOWED_ORIGINS?: string;
 };
 
+const ALLOWED_AD_TYPES = new Set<AdType>(["display_ad", "landing_hero", "email_hero", "social_ad"]);
+
 function json(data: unknown, init?: ResponseInit) {
   return new Response(JSON.stringify(data), {
     ...init,
@@ -291,7 +293,14 @@ export default {
       const form = await req.formData();
       const file = form.get("file");
       const adTypeRaw = form.get("adType");
-      const adType = (typeof adTypeRaw === "string" ? adTypeRaw : "display_ad") as AdType;
+      const adType = typeof adTypeRaw === "string" ? adTypeRaw : "display_ad";
+      if (!ALLOWED_AD_TYPES.has(adType as AdType)) {
+        return withCors(
+          req,
+          env,
+          json({ error: "Invalid adType", allowed: [...ALLOWED_AD_TYPES] }, { status: 400 })
+        );
+      }
 
       const isBlobLike = !!file && typeof file === "object" && typeof (file as any).arrayBuffer === "function";
       if (!isBlobLike) {
@@ -302,8 +311,8 @@ export default {
       const { width, height } = await getImageSize(f);
       const bytes = (f as any).size || 0;
 
-      const scores = scoreFromHeuristics({ width, height, bytes, adType });
-      const { issues, recommendations } = buildIssuesAndRecs({ scores, adType, width, height });
+      const scores = scoreFromHeuristics({ width, height, bytes, adType: adType as AdType });
+      const { issues, recommendations } = buildIssuesAndRecs({ scores, adType: adType as AdType, width, height });
 
       const annotations: AnalysisResponse["annotations"] =
         width && height
