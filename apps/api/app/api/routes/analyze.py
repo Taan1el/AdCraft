@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
@@ -27,7 +27,10 @@ async def analyze(request: Request) -> JSONResponse:
         )
 
     contents = await upload.read()  # type: ignore[attr-defined]
-    image = Image.open(io.BytesIO(contents)).convert("RGB")
+    try:
+        image = Image.open(io.BytesIO(contents)).convert("RGB")
+    except (UnidentifiedImageError, OSError):
+        return JSONResponse({"error": "Uploaded file is not a readable image"}, status_code=400)
 
     if not settings.mock_analysis and not settings.has_llm_credentials:
         return JSONResponse(
