@@ -97,7 +97,7 @@ See [apps/api/.env.example](apps/api/.env.example). Important behavior:
 | Variable | Purpose |
 |----------|---------|
 | `MOCK_ANALYSIS` | `true`: deterministic + template copy only, no LLM. **`false` (default in code):** LLM path; requires `GEMINI_API_KEY` and/or `OPENAI_API_KEY`, or `POST /analyze` returns **503** with a clear error. |
-| `GEMINI_API_KEY` / `OPENAI_API_KEY` | LLM providers (Gemini preferred when both unset logic is in pipeline). |
+| `GEMINI_API_KEY` / `OPENAI_API_KEY` | LLM providers. Gemini is preferred when both keys are configured. |
 | `ALLOWED_ORIGINS` | CORS allowlist; include `https://taan1el.github.io` for the hosted frontend. |
 
 ---
