@@ -16,4 +16,3 @@
     "typecheck:web": "npm --workspace apps/web run typecheck"
   }
 }
-
