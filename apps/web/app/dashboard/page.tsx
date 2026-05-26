@@ -11,12 +11,21 @@ const QUERY_KEY = "adcraft.dashboard.queries";
 
 function getQueryCount(): number {
   if (typeof window === "undefined") return 0;
-  return Number(window.sessionStorage.getItem(QUERY_KEY) ?? 0);
+  try {
+    const count = Number(window.sessionStorage.getItem(QUERY_KEY) ?? 0);
+    return Number.isFinite(count) && count > 0 ? count : 0;
+  } catch {
+    return 0;
+  }
 }
 function bumpQueryCount(): number {
   if (typeof window === "undefined") return 0;
   const n = getQueryCount() + 1;
-  window.sessionStorage.setItem(QUERY_KEY, String(n));
+  try {
+    window.sessionStorage.setItem(QUERY_KEY, String(n));
+  } catch {
+    // Dashboard still works when session storage is unavailable.
+  }
   return n;
 }
 
