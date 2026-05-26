@@ -25,7 +25,7 @@ def _downsample_gray(image: Image.Image, max_side: int = 320) -> tuple[list[int]
     if scale < 1.0:
         gray = gray.resize((max(1, int(w * scale)), max(1, int(h * scale))), Image.BILINEAR)
     w2, h2 = gray.size
-    pixels = list(gray.get_flattened_data())
+    pixels = list(gray.getdata())
     return pixels, w2, h2
 
 
