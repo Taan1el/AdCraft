@@ -60,6 +60,7 @@ create or replace function public.trim_analyses_to_10()
 returns trigger
 language plpgsql
 security definer
+set search_path = ''
 as $$
 begin
   delete from public.analyses
