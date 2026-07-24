@@ -19,6 +19,7 @@ export type AnalysisRow = {
 };
 
 const BUCKET = "ads";
+const HISTORY_LIMIT = 10;
 
 export async function saveAnalysis(opts: {
   file: File;
@@ -65,7 +66,7 @@ export async function listAnalyses(): Promise<AnalysisRow[]> {
     .from("analyses")
     .select("*")
     .order("created_at", { ascending: false })
-    .limit(20);
+    .limit(HISTORY_LIMIT);
   if (error || !data) return [];
 
   const rows = data as AnalysisRow[];
