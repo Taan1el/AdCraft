@@ -1,42 +1,49 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { listAnalyses, type AnalysisRow } from "@/lib/history";
 import { AuthMenu } from "@/components/AuthMenu";
 
 const SESSION_QUERY_CAP = 10;
 const QUERY_KEY = "adcraft.dashboard.queries";
+const QUERY_COUNT_EVENT = "adcraft:query-count";
+let fallbackQueryCount = 0;
 
 function getQueryCount(): number {
   if (typeof window === "undefined") return 0;
   try {
     const count = Number(window.sessionStorage.getItem(QUERY_KEY) ?? 0);
-    return Number.isFinite(count) && count > 0 ? count : 0;
+    fallbackQueryCount = Number.isFinite(count) && count > 0 ? count : 0;
+    return fallbackQueryCount;
   } catch {
-    return 0;
+    return fallbackQueryCount;
   }
 }
-function bumpQueryCount(): number {
-  if (typeof window === "undefined") return 0;
+function bumpQueryCount(): void {
+  if (typeof window === "undefined") return;
   const n = getQueryCount() + 1;
+  fallbackQueryCount = n;
   try {
     window.sessionStorage.setItem(QUERY_KEY, String(n));
   } catch {
     // Dashboard still works when session storage is unavailable.
   }
-  return n;
+  window.dispatchEvent(new Event(QUERY_COUNT_EVENT));
+}
+function subscribeToQueryCount(onStoreChange: () => void): () => void {
+  window.addEventListener(QUERY_COUNT_EVENT, onStoreChange);
+  return () => window.removeEventListener(QUERY_COUNT_EVENT, onStoreChange);
 }
 
 export default function DashboardPage() {
   const { user, authEnabled, loading } = useAuth();
   const [rows, setRows] = useState<AnalysisRow[]>([]);
-  const [queries, setQueries] = useState(0);
+  const queries = useSyncExternalStore(subscribeToQueryCount, getQueryCount, () => 0);
 
   const embed = process.env.NEXT_PUBLIC_THESYS_EMBED_URL || "";
 
-  useEffect(() => { setQueries(getQueryCount()); }, []);
   useEffect(() => {
     if (user) listAnalyses().then(setRows);
   }, [user]);
@@ -87,7 +94,7 @@ export default function DashboardPage() {
               src={embed}
               title="Thesys agent"
               style={{ border: 0, width: "100%", height: "100%", background: "#0a0a0f" }}
-              onLoad={() => setQueries(bumpQueryCount())}
+              onLoad={bumpQueryCount}
             />
           </div>
         )}
