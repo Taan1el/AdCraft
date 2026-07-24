@@ -15,13 +15,13 @@ type AuthState = {
 const Ctx = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
   const authEnabled = isAuthEnabled();
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(authEnabled);
 
   useEffect(() => {
     const sb = getSupabase();
-    if (!sb) { setLoading(false); return; }
+    if (!sb) return;
 
     sb.auth.getSession().then(({ data }: { data: { session: Session | null } }) => {
       setUser(data.session?.user ?? null);
