@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import type { ReactNode } from "react";
 import { AuthProvider } from "@/lib/auth-context";
 import "./globals.css";
+
+const inter = Inter({ subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
   title: "AdCraft AI — Transform Your Ad Creative with AI-Powered Insights",
@@ -30,7 +33,7 @@ const css = `
   body {
     background: var(--bg);
     color: var(--text);
-    font-family: 'Inter', sans-serif;
+    font-family: inherit;
     -webkit-font-smoothing: antialiased;
     line-height: 1;
   }
@@ -81,7 +84,7 @@ const css = `
 
   .btn {
     display: inline-flex; align-items: center; gap: 7px;
-    font-family: 'Inter', sans-serif; font-weight: 600;
+    font-family: inherit; font-weight: 600;
     cursor: pointer; border: none; text-decoration: none; transition: all 0.15s;
   }
   .btn-blue { background: var(--blue); color: #fff; border-radius: 8px; padding: 9px 18px; font-size: 0.82rem; }
@@ -250,12 +253,9 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
   return (
     <html lang="en">
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
         <style dangerouslySetInnerHTML={{ __html: css }} />
       </head>
-      <body><AuthProvider>{children}</AuthProvider></body>
+      <body className={inter.className}><AuthProvider>{children}</AuthProvider></body>
     </html>
   );
 }

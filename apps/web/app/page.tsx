@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { analyzeCreative, isRemoteConfigured, type AnalyzeOutcome } from "@/lib/api";
-import type { AdType, AnalysisResponse } from "@/lib/types";
+import type { AdType } from "@/lib/types";
 import { AuthMenu } from "@/components/AuthMenu";
 import { useAuth } from "@/lib/auth-context";
 import { saveAnalysis } from "@/lib/history";
