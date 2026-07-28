@@ -12,6 +12,13 @@ class LLMError(Exception):
     pass
 
 
+def _response_json(provider: str, response: httpx.Response) -> Any:
+    try:
+        return response.json()
+    except ValueError as e:
+        raise LLMError(f"{provider} returned invalid JSON") from e
+
+
 def _image_to_data_url(image: Image.Image) -> str:
     from io import BytesIO
 
@@ -54,7 +61,7 @@ def call_openai_responses_api(
     if res.status_code >= 400:
         raise LLMError(f"OpenAI error {res.status_code}: {res.text[:4000]}")
 
-    data = res.json()
+    data = _response_json("OpenAI", res)
     if isinstance(data, dict):
         if isinstance(data.get("output_text"), str) and data["output_text"].strip():
             return data["output_text"]
@@ -120,7 +127,7 @@ def call_gemini_generate_content(
     if res.status_code >= 400:
         raise LLMError(f"Gemini error {res.status_code}: {res.text[:4000]}")
 
-    data = res.json()
+    data = _response_json("Gemini", res)
     try:
         candidates = data.get("candidates", [])
         if not candidates:
