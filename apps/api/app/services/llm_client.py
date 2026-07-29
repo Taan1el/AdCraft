@@ -128,6 +128,11 @@ def call_gemini_generate_content(
         raise LLMError(f"Gemini error {res.status_code}: {res.text[:4000]}")
 
     data = _response_json("Gemini", res)
+    # Mirror the OpenAI path: a valid-JSON but non-object body (e.g. a top-level
+    # array from an error proxy) would otherwise reach `data.get` and surface as
+    # an opaque AttributeError instead of a clean provider error.
+    if not isinstance(data, dict):
+        raise LLMError("Gemini returned unexpected JSON shape (expected an object)")
     try:
         candidates = data.get("candidates", [])
         if not candidates:

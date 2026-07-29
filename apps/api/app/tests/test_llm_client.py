@@ -60,6 +60,40 @@ def test_provider_invalid_json_is_wrapped_as_llm_error(
         )
 
 
+@pytest.mark.parametrize(
+    ("provider", "call"),
+    [
+        ("OpenAI", llm_client.call_openai_responses_api),
+        ("Gemini", llm_client.call_gemini_generate_content),
+    ],
+)
+def test_provider_non_object_json_is_wrapped_as_llm_error(
+    monkeypatch: MonkeyPatch,
+    provider: str,
+    call: Callable[..., str],
+) -> None:
+    # A valid-JSON but non-object body (e.g. a top-level array from an error
+    # proxy) must surface as a clean LLMError, not an opaque AttributeError.
+    request = httpx.Request("POST", "https://provider.example/v1/analyze")
+    response = httpx.Response(200, content=json.dumps([{"unexpected": True}]), request=request)
+    monkeypatch.setattr(
+        llm_client.httpx,
+        "Client",
+        lambda **_kwargs: _FakeClient(response),
+    )
+
+    with pytest.raises(LLMError) as exc_info:
+        call(
+            api_key="test-key",
+            model="test-model",
+            prompt_text="Analyze this image.",
+            image=Image.new("RGB", (2, 2), "white"),
+        )
+    # The message must not leak the internal AttributeError from calling
+    # `.get` on a non-dict (e.g. "'list' object has no attribute 'get'").
+    assert "has no attribute" not in str(exc_info.value)
+
+
 def test_openai_nested_output_text_is_joined(monkeypatch: MonkeyPatch) -> None:
     body: dict[str, Any] = {
         "output": [
