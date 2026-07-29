@@ -321,10 +321,10 @@ export default {
                 id: stableId("ann"),
                 type: "box",
                 label: "Primary focus",
-                x: Math.round(width * 0.1),
-                y: Math.round(height * 0.1),
-                w: Math.round(width * 0.8),
-                h: Math.round(height * 0.35),
+                x: 0.1,
+                y: 0.1,
+                w: 0.8,
+                h: 0.35,
               },
             ]
           : [];
