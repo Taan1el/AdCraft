@@ -12,7 +12,7 @@ def create_app() -> Starlette:
         Route("/health", endpoint=health, methods=["GET"]),
         Route("/analyze", endpoint=analyze, methods=["POST"]),
     ]
-    app = Starlette(debug=True, routes=routes)
+    app = Starlette(debug=settings.debug, routes=routes)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.allowed_origins_list,
