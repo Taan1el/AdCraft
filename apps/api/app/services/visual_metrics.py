@@ -25,7 +25,10 @@ def _downsample_gray(image: Image.Image, max_side: int = 320) -> tuple[list[int]
     if scale < 1.0:
         gray = gray.resize((max(1, int(w * scale)), max(1, int(h * scale))), Image.BILINEAR)
     w2, h2 = gray.size
-    pixels = list(gray.getdata())
+    # Pillow 12 deprecated Image.getdata() in favour of get_flattened_data();
+    # prefer the new API when present, fall back for older Pillow releases.
+    flatten = getattr(gray, "get_flattened_data", None)
+    pixels = list(flatten() if flatten is not None else gray.getdata())
     return pixels, w2, h2
 
 
