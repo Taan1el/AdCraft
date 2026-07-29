@@ -144,6 +144,14 @@ def run_analysis(
             raise LLMError("No LLM API key configured (set GEMINI_API_KEY or OPENAI_API_KEY).")
         data = parse_json_object(raw.strip())
         validate_analysis_response(data)
+        # The prompt asks the model to copy analysisId/image/metrics verbatim
+        # from baseResponse, but that instruction is unenforced and schema
+        # validation only checks shape. Pin these server-owned, deterministic
+        # fields so a hallucinated image size or fabricated metric can't
+        # override the ground truth the rest of the app relies on.
+        data["analysisId"] = base_response["analysisId"]
+        data["image"] = base_response["image"]
+        data["metrics"] = base_response["metrics"]
         return data
 
     try:
