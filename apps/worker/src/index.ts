@@ -99,9 +99,8 @@ function clamp01(x: number) {
   return Math.max(0, Math.min(1, x));
 }
 
-function stableId(prefix: string) {
-  // Deterministic ID that looks random enough for UI keys.
-  return `${prefix}_${Date.now().toString(36)}`;
+function uniqueId(prefix: string) {
+  return `${prefix}_${crypto.randomUUID()}`;
 }
 
 async function getImageSize(file: File): Promise<{ width: number; height: number }> {
@@ -199,7 +198,7 @@ function buildIssuesAndRecs(input: {
 
   if (width && height && (width < 600 || height < 400)) {
     issues.push({
-      id: stableId("issue"),
+      id: uniqueId("issue"),
       category: "readability",
       severity: "high",
       title: "Creative resolution is quite small",
@@ -207,7 +206,7 @@ function buildIssuesAndRecs(input: {
         "Small creatives often make text hard to read and reduce perceived quality, especially on high-DPI screens.",
     });
     recommendations.push({
-      id: stableId("rec"),
+      id: uniqueId("rec"),
       category: "readability",
       priority: "high",
       title: "Export at a higher resolution",
@@ -218,7 +217,7 @@ function buildIssuesAndRecs(input: {
 
   if (scores.metrics.visualDensity > 0.78) {
     issues.push({
-      id: stableId("issue"),
+      id: uniqueId("issue"),
       category: "visualHierarchy",
       severity: "medium",
       title: "The layout may feel visually busy",
@@ -226,7 +225,7 @@ function buildIssuesAndRecs(input: {
         "High visual density can weaken hierarchy: users don’t know where to look first and CTAs can get lost.",
     });
     recommendations.push({
-      id: stableId("rec"),
+      id: uniqueId("rec"),
       category: "visualHierarchy",
       priority: "medium",
       title: "Simplify the above-the-fold message",
@@ -237,7 +236,7 @@ function buildIssuesAndRecs(input: {
 
   if (adType === "email_hero" && scores.metrics.whitespaceRatio < 0.18) {
     issues.push({
-      id: stableId("issue"),
+      id: uniqueId("issue"),
       category: "layoutBalance",
       severity: "low",
       title: "Email heroes benefit from more padding",
@@ -245,7 +244,7 @@ function buildIssuesAndRecs(input: {
         "Email clients compress layouts; tight spacing can hurt scanability and tap targets.",
     });
     recommendations.push({
-      id: stableId("rec"),
+      id: uniqueId("rec"),
       category: "layoutBalance",
       priority: "low",
       title: "Add safe padding and larger CTA",
@@ -256,7 +255,7 @@ function buildIssuesAndRecs(input: {
 
   if (recommendations.length === 0) {
     recommendations.push({
-      id: stableId("rec"),
+      id: uniqueId("rec"),
       category: "ctaProminence",
       priority: "medium",
       title: "Make the CTA unmistakable",
@@ -318,7 +317,7 @@ export default {
         width && height
           ? [
               {
-                id: stableId("ann"),
+                id: uniqueId("ann"),
                 type: "box",
                 label: "Primary focus",
                 x: 0.1,
@@ -330,7 +329,7 @@ export default {
           : [];
 
       const response: AnalysisResponse = {
-        analysisId: stableId("analysis"),
+        analysisId: uniqueId("analysis"),
         image: { width, height },
         overallScore: scores.overallScore,
         summary:
