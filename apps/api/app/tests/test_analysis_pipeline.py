@@ -36,7 +36,17 @@ def _model_response_with_bogus_ground_truth() -> str:
                 }
             ],
             "recommendations": [],
-            "annotations": [],
+            "annotations": [
+                {
+                    "id": "ann_model_moved",
+                    "type": "box",
+                    "label": "Model relocated this overlay",
+                    "x": 0.0,
+                    "y": 0.0,
+                    "w": 1.0,
+                    "h": 1.0,
+                }
+            ],
             "metrics": {
                 "whitespaceRatio": 0.99,
                 "visualDensity": 0.99,
@@ -85,6 +95,12 @@ def test_pipeline_pins_server_owned_fields_over_model_output(monkeypatch: Monkey
     # Model-authored content fields are preserved untouched.
     assert result["summary"] == "MODEL SUMMARY should survive"
     assert result["issues"][0]["id"] == "issue_model"
+
+    # Annotations are pixel-anchored overlays computed server-side, not the
+    # full-frame box the model tried to substitute.
+    _, server_annotations = compute_deterministic_metrics(image)
+    assert result["annotations"] == server_annotations
+    assert all(a["id"] != "ann_model_moved" for a in result["annotations"])
 
 
 def test_pipeline_falls_back_to_base_response_on_invalid_model_output(monkeypatch: MonkeyPatch) -> None:
