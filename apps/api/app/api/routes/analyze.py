@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 
 from PIL import Image, UnidentifiedImageError
+from starlette.datastructures import UploadFile
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
@@ -11,12 +12,14 @@ from app.services.analysis_pipeline import run_analysis
 
 
 ALLOWED_AD_TYPES = {"display_ad", "landing_hero", "email_hero", "social_ad"}
+MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+MAX_IMAGE_PIXELS = 40_000_000
 
 
 async def analyze(request: Request) -> JSONResponse:
     form = await request.form()
     upload = form.get("file")
-    if upload is None:
+    if not isinstance(upload, UploadFile):
         return JSONResponse({"error": "Missing file"}, status_code=400)
 
     ad_type = str(form.get("adType") or "")
@@ -26,9 +29,24 @@ async def analyze(request: Request) -> JSONResponse:
             status_code=400,
         )
 
-    contents = await upload.read()  # type: ignore[attr-defined]
+    contents = await upload.read(MAX_UPLOAD_BYTES + 1)
+    if len(contents) > MAX_UPLOAD_BYTES:
+        return JSONResponse({"error": "Uploaded file is too large"}, status_code=413)
+
     try:
-        image = Image.open(io.BytesIO(contents)).convert("RGB")
+        with Image.open(io.BytesIO(contents)) as source:
+            width, height = source.size
+            if width * height > MAX_IMAGE_PIXELS:
+                return JSONResponse(
+                    {"error": "Uploaded image has too many pixels"},
+                    status_code=413,
+                )
+            image = source.convert("RGB")
+    except Image.DecompressionBombError:
+        return JSONResponse(
+            {"error": "Uploaded image has too many pixels"},
+            status_code=413,
+        )
     except (UnidentifiedImageError, OSError):
         return JSONResponse({"error": "Uploaded file is not a readable image"}, status_code=400)
 
