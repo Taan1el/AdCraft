@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 
 from PIL import Image, UnidentifiedImageError
-from starlette.datastructures import UploadFile
+from starlette.datastructures import FormData, UploadFile
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
@@ -14,6 +14,19 @@ from app.services.analysis_pipeline import run_analysis
 ALLOWED_AD_TYPES = {"display_ad", "landing_hero", "email_hero", "social_ad"}
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 MAX_IMAGE_PIXELS = 40_000_000
+MAX_CONTEXT_CHARS = 2_000
+
+
+def _read_optional_context(form: FormData, name: str) -> str | None:
+    value = form.get(name)
+    if value in (None, ""):
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"Invalid {name}")
+    value = value.strip()
+    if len(value) > MAX_CONTEXT_CHARS:
+        raise ValueError(f"{name} is too long")
+    return value or None
 
 
 async def analyze(request: Request) -> JSONResponse:
@@ -28,6 +41,13 @@ async def analyze(request: Request) -> JSONResponse:
             {"error": "Invalid adType", "allowed": sorted(ALLOWED_AD_TYPES)},
             status_code=400,
         )
+
+    try:
+        campaign_goal = _read_optional_context(form, "campaignGoal")
+        audience = _read_optional_context(form, "audience")
+        brand_name = _read_optional_context(form, "brandName")
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
 
     contents = await upload.read(MAX_UPLOAD_BYTES + 1)
     if len(contents) > MAX_UPLOAD_BYTES:
@@ -61,9 +81,9 @@ async def analyze(request: Request) -> JSONResponse:
     result = run_analysis(
         image=image,
         ad_type=ad_type,
-        campaign_goal=str(form.get("campaignGoal") or "") or None,
-        audience=str(form.get("audience") or "") or None,
-        brand_name=str(form.get("brandName") or "") or None,
+        campaign_goal=campaign_goal,
+        audience=audience,
+        brand_name=brand_name,
     )
     return JSONResponse(result)
 

@@ -58,3 +58,44 @@ def test_analyze_rejects_image_over_pixel_limit(monkeypatch: MonkeyPatch) -> Non
     assert res.status_code == 413
     assert res.json() == {"error": "Uploaded image has too many pixels"}
 
+
+def test_analyze_rejects_oversized_optional_context(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setattr(analyze_route, "MAX_CONTEXT_CHARS", 8)
+    client = TestClient(app)
+
+    res = client.post(
+        "/analyze",
+        files={"file": ("test.png", _png_bytes((2, 2)), "image/png")},
+        data={"adType": "display_ad", "campaignGoal": "nine chars"},
+    )
+
+    assert res.status_code == 400
+    assert res.json() == {"error": "campaignGoal is too long"}
+
+
+def test_analyze_trims_optional_context(monkeypatch: MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_run_analysis(**kwargs: object) -> dict:
+        captured.update(kwargs)
+        return {"ok": True}
+
+    monkeypatch.setattr(analyze_route, "run_analysis", fake_run_analysis)
+    client = TestClient(app)
+
+    res = client.post(
+        "/analyze",
+        files={"file": ("test.png", _png_bytes((2, 2)), "image/png")},
+        data={
+            "adType": "display_ad",
+            "campaignGoal": "  conversions  ",
+            "audience": "   ",
+            "brandName": "Acme",
+        },
+    )
+
+    assert res.status_code == 200
+    assert captured["campaign_goal"] == "conversions"
+    assert captured["audience"] is None
+    assert captured["brand_name"] == "Acme"
+
