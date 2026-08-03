@@ -26,6 +26,28 @@ def test_parse_json_object_rejects_non_object_top_level() -> None:
         parse_json_object("[1, 2, 3]")
 
 
+def test_parse_json_object_unwraps_json_code_fence() -> None:
+    # Models often wrap the object in ```json … ``` despite the prompt.
+    fenced = '```json\n{"a": 1, "b": [2, 3]}\n```'
+    assert parse_json_object(fenced) == {"a": 1, "b": [2, 3]}
+
+
+def test_parse_json_object_unwraps_bare_code_fence() -> None:
+    fenced = '```\n{"a": 1}\n```'
+    assert parse_json_object(fenced) == {"a": 1}
+
+
+def test_parse_json_object_unwraps_fence_with_surrounding_whitespace() -> None:
+    fenced = '\n\n  ```json\n{"ok": true}\n```   \n'
+    assert parse_json_object(fenced) == {"ok": True}
+
+
+def test_parse_json_object_fenced_non_object_still_rejected() -> None:
+    # Unwrapping must not smuggle a non-object past the top-level check.
+    with pytest.raises(InvalidModelOutput, match="object at top-level"):
+        parse_json_object("```json\n[1, 2, 3]\n```")
+
+
 def _valid_response() -> dict:
     return {
         "analysisId": "an_123",
