@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from PIL import Image
 
 from app.services.visual_metrics import Metrics, compute_deterministic_metrics
@@ -67,3 +68,23 @@ def test_deterministic_for_same_input() -> None:
 
     assert _metric_values(first) == _metric_values(second)
     assert first_ann == second_ann
+
+
+@pytest.mark.parametrize("size", [(1, 1), (1, 64), (64, 1), (2, 2), (320, 1)])
+def test_degenerate_dimensions_do_not_crash(size: tuple[int, int]) -> None:
+    # A 1px-tall banner or a tracking-pixel-sized upload collapses every loop
+    # bound to zero and every denominator to one. The module's max(1, ...)
+    # guards exist precisely for this; lock in that they still hold so a future
+    # refactor cannot reintroduce a ZeroDivisionError or an empty-range crash.
+    img = Image.new("RGB", size, "white")
+    metrics, annotations = compute_deterministic_metrics(img)
+
+    for value in _metric_values(metrics):
+        assert 0.0 <= value <= 1.0
+    # Structural annotations are emitted regardless of input size, with bounds
+    # that never escape the unit square even when width or height is 1.
+    ids = {a["id"] for a in annotations}
+    assert {"ann_cta_candidate", "ann_clutter"} <= ids
+    for ann in annotations:
+        for key in ("x", "y", "w", "h"):
+            assert 0.0 <= ann[key] <= 1.0
