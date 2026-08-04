@@ -55,7 +55,14 @@ export async function saveAnalysis(opts: {
     summary: opts.result.summary,
     source: opts.source,
   });
-  if (ins.error) return { saved: false, error: ins.error.message };
+  if (ins.error) {
+    try {
+      await sb.storage.from(BUCKET).remove([key]);
+    } catch {
+      // Preserve the database error even if best-effort orphan cleanup fails.
+    }
+    return { saved: false, error: ins.error.message };
+  }
   return { saved: true };
 }
 
