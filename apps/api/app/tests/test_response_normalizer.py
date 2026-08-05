@@ -42,6 +42,24 @@ def test_parse_json_object_unwraps_fence_with_surrounding_whitespace() -> None:
     assert parse_json_object(fenced) == {"ok": True}
 
 
+def test_parse_json_object_unwraps_fence_after_prose() -> None:
+    # Models often prepend a sentence before the fenced payload.
+    fenced = 'Here is the analysis you asked for:\n```json\n{"a": 1}\n```'
+    assert parse_json_object(fenced) == {"a": 1}
+
+
+def test_parse_json_object_ignores_trailing_signoff() -> None:
+    # ...and sometimes add a sign-off after the closing fence.
+    fenced = '```json\n{"a": 1}\n```\nHope this helps! Let me know if you need more.'
+    assert parse_json_object(fenced) == {"a": 1}
+
+
+def test_parse_json_object_handles_truncated_fence() -> None:
+    # A cut-off response may never emit the closing fence.
+    fenced = '```json\n{"a": 1, "b": 2}'
+    assert parse_json_object(fenced) == {"a": 1, "b": 2}
+
+
 def test_parse_json_object_fenced_non_object_still_rejected() -> None:
     # Unwrapping must not smuggle a non-object past the top-level check.
     with pytest.raises(InvalidModelOutput, match="object at top-level"):

@@ -18,20 +18,29 @@ def _strip_code_fence(text: str) -> str:
     The prompt asks for raw JSON, but models routinely ignore that and wrap the
     object in a ```json … ``` block. Without this, a fenced-but-otherwise-valid
     response fails json.loads, burns a retry call, and often falls back to the
-    deterministic base response — silently dropping the LLM critique. Only the
-    wrapping fence is removed; non-fenced text is returned unchanged so genuine
-    garbage still fails loudly downstream.
+    deterministic base response — silently dropping the LLM critique.
+
+    Handles the common ways a model dresses up the payload:
+      * a bare ```…``` fence or a language-tagged ```json fence;
+      * explanatory prose *before* the fence ("Here is the analysis:\\n```…");
+      * a trailing sign-off *after* the closing fence ("```\\nHope this helps!");
+      * a truncated response whose closing fence never arrived.
+    Only fenced content is unwrapped — text with no fence at all is returned
+    unchanged so genuine garbage still fails loudly downstream.
     """
     t = text.strip()
-    if not t.startswith("```"):
+    open_idx = 0 if t.startswith("```") else t.find("```")
+    if open_idx == -1:
         return t
+    t = t[open_idx:]
     newline = t.find("\n")
     if newline == -1:
         # A single-line "```…" is malformed; let json.loads report it cleanly.
         return t
-    inner = t[newline + 1 :].rstrip()
-    if inner.endswith("```"):
-        inner = inner[: inner.rfind("```")]
+    inner = t[newline + 1 :]
+    close_idx = inner.find("```")
+    if close_idx != -1:
+        inner = inner[:close_idx]
     return inner.strip()
 
 
