@@ -122,3 +122,20 @@ def test_validate_rejects_object_missing_required_fields() -> None:
     del broken["overallScore"]
     with pytest.raises(InvalidModelOutput, match="schema validation"):
         validate_analysis_response(broken)
+
+
+def test_validate_rejects_off_contract_issue_severity() -> None:
+    # The UI badge only styles low/medium/high; anything else silently renders
+    # as "low", so a model that invents "critical" must fail validation (and be
+    # re-prompted) rather than mislabel a severe issue as low.
+    broken = _valid_response()
+    broken["issues"][0]["severity"] = "critical"
+    with pytest.raises(InvalidModelOutput, match="schema validation"):
+        validate_analysis_response(broken)
+
+
+def test_validate_rejects_off_contract_recommendation_priority() -> None:
+    broken = _valid_response()
+    broken["recommendations"][0]["priority"] = "urgent"
+    with pytest.raises(InvalidModelOutput, match="schema validation"):
+        validate_analysis_response(broken)

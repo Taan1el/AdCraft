@@ -51,7 +51,7 @@ ANALYSIS_RESPONSE_SCHEMA: dict = {
                 "properties": {
                     "id": {"type": "string"},
                     "category": {"type": "string"},
-                    "severity": {"type": "string"},
+                    "severity": {"type": "string", "enum": ["low", "medium", "high"]},
                     "title": {"type": "string"},
                     "description": {"type": "string"},
                 },
@@ -66,7 +66,7 @@ ANALYSIS_RESPONSE_SCHEMA: dict = {
                 "properties": {
                     "id": {"type": "string"},
                     "category": {"type": "string"},
-                    "priority": {"type": "string"},
+                    "priority": {"type": "string", "enum": ["low", "medium", "high"]},
                     "title": {"type": "string"},
                     "action": {"type": "string"},
                 },
