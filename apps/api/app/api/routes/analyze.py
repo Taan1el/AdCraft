@@ -30,7 +30,13 @@ def _read_optional_context(form: FormData, name: str) -> str | None:
 
 
 async def analyze(request: Request) -> JSONResponse:
-    form = await request.form()
+    try:
+        form = await request.form()
+    except ValueError:
+        # python-multipart raises MultipartParseError (a ValueError subclass)
+        # for malformed bodies. Treat bad client input as a 400 instead of
+        # letting it escape through Starlette as an internal server error.
+        return JSONResponse({"error": "Malformed multipart form data"}, status_code=400)
     upload = form.get("file")
     if not isinstance(upload, UploadFile):
         return JSONResponse({"error": "Missing file"}, status_code=400)

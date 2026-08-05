@@ -31,6 +31,19 @@ def test_analyze_schema() -> None:
     validate(instance=res.json(), schema=ANALYSIS_RESPONSE_SCHEMA)
 
 
+def test_analyze_rejects_malformed_multipart() -> None:
+    client = TestClient(app)
+
+    res = client.post(
+        "/analyze",
+        content=b"not multipart",
+        headers={"content-type": "multipart/form-data; boundary=x"},
+    )
+
+    assert res.status_code == 400
+    assert res.json() == {"error": "Malformed multipart form data"}
+
+
 def test_analyze_rejects_upload_over_byte_limit(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr(analyze_route, "MAX_UPLOAD_BYTES", 16)
     client = TestClient(app)
