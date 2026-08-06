@@ -6,6 +6,7 @@ import type { AdType } from "@/lib/types";
 import { AuthMenu } from "@/components/AuthMenu";
 import { useAuth } from "@/lib/auth-context";
 import { saveAnalysis } from "@/lib/history";
+import { formatPct01 } from "@/lib/utils";
 
 // 6 truthful feature cards — each one maps to actual capability in the codebase.
 const FEATURES = [
@@ -456,10 +457,10 @@ function AnalysisResultsInline({
             <div style={{ fontSize: "0.72rem", fontWeight: 600, color: "var(--text-dim)", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 12 }}>Pixel metrics</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
               {[
-                ["Whitespace", `${Math.round(result.metrics.whitespaceRatio * 100)}%`],
-                ["Visual density", `${Math.round(result.metrics.visualDensity * 100)}%`],
+                ["Whitespace", formatPct01(result.metrics.whitespaceRatio)],
+                ["Visual density", formatPct01(result.metrics.visualDensity)],
                 ["Contrast", `${result.metrics.contrastScore.toFixed(1)}:1`],
-                ["CTA saliency", `${Math.round(result.metrics.ctaSaliencyScore * 100)}%`],
+                ["CTA saliency", formatPct01(result.metrics.ctaSaliencyScore)],
               ].map(([label, val]) => (
                 <div key={label} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 8, padding: "10px 12px" }}>
                   <div style={{ fontSize: "0.7rem", color: "var(--text-dim)", letterSpacing: "0.04em", marginBottom: 4 }}>{label}</div>
