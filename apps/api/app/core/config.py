@@ -39,7 +39,21 @@ class Settings:
 
     @property
     def allowed_origins_list(self) -> list[str]:
-        return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
+        # Starlette's CORSMiddleware matches allow_origins against the request's
+        # Origin header by *exact string*. Browsers never send a trailing slash
+        # (the Origin is scheme://host[:port] only), so an entry like
+        # "https://taan1el.github.io/" would silently never match and the
+        # deployed frontend gets CORS-blocked with no server-side error. Strip a
+        # trailing slash from each entry and drop duplicates while preserving
+        # order so a misconfigured env var can't quietly break CORS.
+        seen: set[str] = set()
+        origins: list[str] = []
+        for raw in self.allowed_origins.split(","):
+            origin = raw.strip().rstrip("/")
+            if origin and origin not in seen:
+                seen.add(origin)
+                origins.append(origin)
+        return origins
 
 
 settings = Settings()

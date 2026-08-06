@@ -22,3 +22,41 @@ def test_create_app_uses_configured_debug_mode(monkeypatch: MonkeyPatch) -> None
     monkeypatch.setattr(main.settings, "debug", True)
 
     assert main.create_app().debug is True
+
+
+def test_allowed_origins_list_splits_and_trims(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv(
+        "ALLOWED_ORIGINS", " https://a.example , http://b.example ,, "
+    )
+
+    assert Settings().allowed_origins_list == [
+        "https://a.example",
+        "http://b.example",
+    ]
+
+
+def test_allowed_origins_list_strips_trailing_slash(monkeypatch: MonkeyPatch) -> None:
+    # A trailing slash makes CORSMiddleware's exact-match never fire against a
+    # browser Origin header, silently blocking the deployed frontend.
+    monkeypatch.setenv("ALLOWED_ORIGINS", "https://taan1el.github.io/")
+
+    assert Settings().allowed_origins_list == ["https://taan1el.github.io"]
+
+
+def test_allowed_origins_list_dedupes_preserving_order(monkeypatch: MonkeyPatch) -> None:
+    # Slash-normalized duplicates must collapse to a single entry, first wins.
+    monkeypatch.setenv(
+        "ALLOWED_ORIGINS",
+        "https://a.example/,https://a.example,http://b.example,https://a.example",
+    )
+
+    assert Settings().allowed_origins_list == [
+        "https://a.example",
+        "http://b.example",
+    ]
+
+
+def test_allowed_origins_list_wildcard_survives(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv("ALLOWED_ORIGINS", "*")
+
+    assert Settings().allowed_origins_list == ["*"]
