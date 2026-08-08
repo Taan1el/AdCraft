@@ -66,6 +66,24 @@ def test_parse_json_object_fenced_non_object_still_rejected() -> None:
         parse_json_object("```json\n[1, 2, 3]\n```")
 
 
+def test_parse_json_object_keeps_unfenced_json_with_inline_backticks() -> None:
+    # Valid *unfenced* JSON whose string value contains a ``` sequence (e.g. an
+    # ad critique that quotes a code snippet) must parse as-is. Feeding it to the
+    # fence stripper would slice at the in-string backticks and corrupt it, so
+    # the raw text has to be tried before any unwrapping.
+    raw = '{"summary": "Use a code block like ```css for the CTA styling."}'
+    assert parse_json_object(raw) == {
+        "summary": "Use a code block like ```css for the CTA styling.",
+    }
+
+
+def test_parse_json_object_still_unwraps_fenced_json_with_inline_backticks() -> None:
+    # The raw-first parse must not regress the fenced path: a genuinely fenced
+    # payload is still unwrapped even when its content mentions backticks.
+    fenced = '```json\n{"note": "avoid nested ` marks"}\n```'
+    assert parse_json_object(fenced) == {"note": "avoid nested ` marks"}
+
+
 def _valid_response() -> dict:
     return {
         "analysisId": "an_123",

@@ -45,10 +45,22 @@ def _strip_code_fence(text: str) -> str:
 
 
 def parse_json_object(text: str) -> dict[str, Any]:
+    """Parse the model's response into a top-level JSON object.
+
+    Tries the raw text first and only unwraps a Markdown code fence if that
+    fails. The ordering matters: a model can return unfenced JSON whose string
+    values legitimately contain a ``` sequence (e.g. an ad critique that quotes
+    ```css```). ``_strip_code_fence`` would latch onto those in-string backticks
+    and slice mid-object, corrupting otherwise-valid JSON — so it is used only as
+    a fallback when the raw payload is not already parseable.
+    """
     try:
-        data = json.loads(_strip_code_fence(text))
-    except Exception as e:  # noqa: BLE001
-        raise InvalidModelOutput(f"Model did not return valid JSON: {e}") from e
+        data = json.loads(text)
+    except Exception:  # noqa: BLE001 -- retry via the fence stripper below
+        try:
+            data = json.loads(_strip_code_fence(text))
+        except Exception as e:  # noqa: BLE001
+            raise InvalidModelOutput(f"Model did not return valid JSON: {e}") from e
     if not isinstance(data, dict):
         raise InvalidModelOutput("Model JSON must be an object at top-level")
     return data
