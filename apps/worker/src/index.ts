@@ -289,7 +289,16 @@ export default {
         );
       }
 
-      const form = await req.formData();
+      let form: FormData;
+      try {
+        form = await req.formData();
+      } catch {
+        return withCors(
+          req,
+          env,
+          json({ error: "Malformed multipart form data" }, { status: 400 })
+        );
+      }
       const file = form.get("file");
       const adTypeRaw = form.get("adType");
       const adType = typeof adTypeRaw === "string" ? adTypeRaw : "display_ad";
