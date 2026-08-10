@@ -18,6 +18,27 @@ def test_debug_can_be_enabled_explicitly(monkeypatch: MonkeyPatch) -> None:
     assert Settings().debug is True
 
 
+def test_whitespace_only_api_keys_do_not_enable_llm(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "   ")
+    monkeypatch.setenv("GEMINI_API_KEY", "\t")
+
+    settings = Settings()
+
+    assert settings.openai_api_key is None
+    assert settings.gemini_api_key is None
+    assert settings.has_llm_credentials is False
+
+
+def test_api_keys_trim_accidental_outer_whitespace(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "  test-key  ")
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+    settings = Settings()
+
+    assert settings.openai_api_key == "test-key"
+    assert settings.has_llm_credentials is True
+
+
 def test_create_app_uses_configured_debug_mode(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr(main.settings, "debug", True)
 

@@ -12,12 +12,19 @@ def _get_bool(name: str, default: bool) -> bool:
     return v.strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
+def _get_optional_secret(name: str) -> str | None:
+    value = os.getenv(name)
+    if value is None:
+        return None
+    return value.strip() or None
+
+
 class Settings:
     def __init__(self) -> None:
         self.debug = _get_bool("DEBUG", False)
-        self.openai_api_key = os.getenv("OPENAI_API_KEY") or None
+        self.openai_api_key = _get_optional_secret("OPENAI_API_KEY")
         self.openai_model = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
-        self.gemini_api_key = os.getenv("GEMINI_API_KEY") or None
+        self.gemini_api_key = _get_optional_secret("GEMINI_API_KEY")
         self.gemini_model = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
         self.mock_analysis = _get_bool("MOCK_ANALYSIS", False)
         self.allowed_origins = os.getenv(
