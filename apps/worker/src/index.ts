@@ -61,6 +61,7 @@ type Env = {
 };
 
 const ALLOWED_AD_TYPES = new Set<AdType>(["display_ad", "landing_hero", "email_hero", "social_ad"]);
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 
 function json(data: unknown, init?: ResponseInit) {
   return new Response(JSON.stringify(data), {
@@ -316,8 +317,15 @@ export default {
       }
 
       const f = file as any as File;
+      const bytes = typeof f.size === "number" ? f.size : 0;
+      if (bytes > MAX_UPLOAD_BYTES) {
+        return withCors(
+          req,
+          env,
+          json({ error: "Uploaded file is too large" }, { status: 413 })
+        );
+      }
       const { width, height } = await getImageSize(f);
-      const bytes = (f as any).size || 0;
 
       const scores = scoreFromHeuristics({ width, height, bytes, adType: adType as AdType });
       const { issues, recommendations } = buildIssuesAndRecs({ scores, adType: adType as AdType, width, height });
