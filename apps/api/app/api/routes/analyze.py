@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 from starlette.datastructures import FormData, UploadFile
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -61,13 +61,14 @@ async def analyze(request: Request) -> JSONResponse:
 
     try:
         with Image.open(io.BytesIO(contents)) as source:
-            width, height = source.size
-            if width * height > MAX_IMAGE_PIXELS:
+            if source.width * source.height > MAX_IMAGE_PIXELS:
                 return JSONResponse(
                     {"error": "Uploaded image has too many pixels"},
                     status_code=413,
                 )
-            image = source.convert("RGB")
+            oriented = ImageOps.exif_transpose(source)
+            width, height = oriented.size
+            image = oriented.convert("RGB")
     except Image.DecompressionBombError:
         return JSONResponse(
             {"error": "Uploaded image has too many pixels"},

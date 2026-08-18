@@ -5,8 +5,10 @@ from __future__ import annotations
 from io import BytesIO
 
 from PIL import Image
+from pytest import MonkeyPatch
 from starlette.testclient import TestClient
 
+from app.api.routes import analyze as analyze_route
 from app.api.routes.analyze import ALLOWED_AD_TYPES
 from app.main import app
 
@@ -15,6 +17,18 @@ def _png_bytes(size: tuple[int, int] = (4, 4)) -> bytes:
     img = Image.new("RGB", size, "white")
     buf = BytesIO()
     img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def _orientation_6_jpeg_bytes() -> bytes:
+    image = Image.new("RGB", (8, 4), "red")
+    for x in range(4, 8):
+        for y in range(4):
+            image.putpixel((x, y), (0, 0, 255))
+    exif = Image.Exif()
+    exif[274] = 6
+    buf = BytesIO()
+    image.save(buf, format="JPEG", quality=100, subsampling=0, exif=exif)
     return buf.getvalue()
 
 
@@ -83,3 +97,31 @@ def test_analyze_rejects_non_text_optional_context() -> None:
 
     assert res.status_code == 400
     assert res.json() == {"error": "Invalid campaignGoal"}
+
+
+def test_analyze_applies_exif_orientation_before_analysis(monkeypatch: MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_run_analysis(**kwargs: object) -> dict[str, bool]:
+        image = kwargs["image"]
+        assert isinstance(image, Image.Image)
+        captured["size"] = image.size
+        captured["top_pixel"] = image.getpixel((1, 1))
+        captured["bottom_pixel"] = image.getpixel((1, 6))
+        return {"ok": True}
+
+    monkeypatch.setattr(analyze_route, "run_analysis", fake_run_analysis)
+    client = TestClient(app)
+
+    res = client.post(
+        "/analyze",
+        files={"file": ("rotated.jpg", _orientation_6_jpeg_bytes(), "image/jpeg")},
+        data={"adType": "display_ad"},
+    )
+
+    assert res.status_code == 200
+    assert captured["size"] == (4, 8)
+    top = captured["top_pixel"]
+    bottom = captured["bottom_pixel"]
+    assert isinstance(top, tuple) and top[0] > top[2]
+    assert isinstance(bottom, tuple) and bottom[2] > bottom[0]
