@@ -66,9 +66,8 @@ async def analyze(request: Request) -> JSONResponse:
                     {"error": "Uploaded image has too many pixels"},
                     status_code=413,
                 )
-            oriented = ImageOps.exif_transpose(source)
-            width, height = oriented.size
-            image = oriented.convert("RGB")
+            ImageOps.exif_transpose(source, in_place=True)
+            image = source.convert("RGB")
     except Image.DecompressionBombError:
         return JSONResponse(
             {"error": "Uploaded image has too many pixels"},
