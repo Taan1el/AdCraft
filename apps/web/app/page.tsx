@@ -71,6 +71,7 @@ function Logo() {
 export default function Home() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const resultsRef = useRef<HTMLDivElement | null>(null);
+  const analysisRunRef = useRef(0);
   const [dragOver, setDragOver] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [adType] = useState<AdType>("display_ad");
@@ -90,20 +91,24 @@ export default function Home() {
   const { user } = useAuth();
 
   const runAnalysis = useCallback(async (f: File) => {
+    const runId = ++analysisRunRef.current;
     setLoading(true);
     setError(null);
     setOutcome(null);
     try {
       const out = await analyzeCreative({ file: f, adType });
+      if (analysisRunRef.current !== runId) return;
       setOutcome(out);
       if (user) {
         const source: "local" | "gemini" = out.source === "remote" ? "gemini" : "local";
         void saveAnalysis({ file: f, adType, result: out.result, source });
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Analysis failed");
+      if (analysisRunRef.current === runId) {
+        setError(e instanceof Error ? e.message : "Analysis failed");
+      }
     } finally {
-      setLoading(false);
+      if (analysisRunRef.current === runId) setLoading(false);
     }
   }, [adType, user]);
 
@@ -117,11 +122,19 @@ export default function Home() {
   }, [runAnalysis]);
 
   const reset = useCallback(() => {
+    // Invalidate any in-flight request so a late response cannot repopulate a
+    // reset page or overwrite a newer upload's result.
+    analysisRunRef.current += 1;
+    setLoading(false);
     setFile(null);
     setOutcome(null);
     setError(null);
     setPreviewUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
     if (fileInputRef.current) fileInputRef.current.value = "";
+  }, []);
+
+  useEffect(() => () => {
+    analysisRunRef.current += 1;
   }, []);
 
   useEffect(() => {
