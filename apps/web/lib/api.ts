@@ -20,6 +20,16 @@ export type AnalyzeOutcome = {
   fallbackReason?: string;
 };
 
+class RemoteAnalyzeError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "RemoteAnalyzeError";
+  }
+}
+
 function apiBase(): string | null {
   // explicit empty string disables the backend and forces local heuristic mode
   const v = process.env.NEXT_PUBLIC_API_URL;
@@ -49,7 +59,10 @@ async function tryRemote(base: string, input: AnalyzeInput): Promise<AnalysisRes
     const res = await fetch(`${base}/analyze`, { method: "POST", body: fd, signal: ctrl.signal });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
-      throw new Error(`Analyze failed (${res.status}): ${text || res.statusText}`);
+      throw new RemoteAnalyzeError(
+        res.status,
+        `Analyze failed (${res.status}): ${text || res.statusText}`,
+      );
     }
     return (await res.json()) as AnalysisResponse;
   } finally {
@@ -64,6 +77,19 @@ export async function analyzeCreative(input: AnalyzeInput): Promise<AnalyzeOutco
       const result = await tryRemote(base, input);
       return { result, source: "remote", fellBack: false };
     } catch (err) {
+      // Invalid uploads and other client errors need to reach the user. Running
+      // the same rejected input through local heuristics can hide backend size
+      // or image-validation failures and produce a misleading "successful"
+      // analysis. Availability errors and rate limits may still fall back.
+      if (
+        err instanceof RemoteAnalyzeError &&
+        err.status >= 400 &&
+        err.status < 500 &&
+        err.status !== 408 &&
+        err.status !== 429
+      ) {
+        throw err;
+      }
       const reason = err instanceof Error ? err.message : "Unknown error";
       const result = await analyzeLocally(input.file, input.adType);
       return { result, source: "local", fellBack: true, fallbackReason: reason };
