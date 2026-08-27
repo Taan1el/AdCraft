@@ -14,6 +14,13 @@ type AuthState = {
 
 const Ctx = createContext<AuthState | null>(null);
 
+function getAuthRedirectUrl(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  const basePath = (process.env.NEXT_PUBLIC_BASE_PATH || "").trim().replace(/^\/+|\/+$/g, "");
+  const appPath = basePath ? `/${basePath}/` : "/";
+  return new URL(appPath, window.location.origin).toString();
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const authEnabled = isAuthEnabled();
   const [user, setUser] = useState<User | null>(null);
@@ -39,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!sb) return { ok: false, message: "Auth is not configured." };
     const { error } = await sb.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined },
+      options: { emailRedirectTo: getAuthRedirectUrl() },
     });
     if (error) return { ok: false, message: error.message };
     return { ok: true, message: "Check your email for a sign-in link." };
