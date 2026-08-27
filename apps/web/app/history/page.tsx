@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { listAnalyses, computeAggregates, deleteAnalysis, type AnalysisRow, type Aggregates } from "@/lib/history";
@@ -23,22 +23,34 @@ function scoreColor(v: number) {
 
 export default function HistoryPage() {
   const { user, loading: authLoading, authEnabled } = useAuth();
-  const [rows, setRows] = useState<AnalysisRow[] | null>(null);
-  const [agg, setAgg] = useState<Aggregates | null>(null);
+  const [history, setHistory] = useState<{
+    userId: string;
+    rows: AnalysisRow[];
+    agg: Aggregates;
+  } | null>(null);
+  const requestIdRef = useRef(0);
+  const visibleHistory = history?.userId === user?.id ? history : null;
+  const rows = visibleHistory?.rows ?? null;
+  const agg = visibleHistory?.agg ?? null;
 
   useEffect(() => {
-    if (!user) return;
-    listAnalyses().then((rs) => {
-      setRows(rs);
-      setAgg(computeAggregates(rs));
+    const userId = user?.id;
+    const requestId = ++requestIdRef.current;
+    if (!userId) return;
+    void listAnalyses().then((rs) => {
+      if (requestIdRef.current !== requestId) return;
+      setHistory({ userId, rows: rs, agg: computeAggregates(rs) });
     });
-  }, [user]);
+  }, [user?.id]);
 
   async function handleDelete(row: AnalysisRow) {
+    const userId = user?.id;
+    if (!userId) return;
+    const requestId = ++requestIdRef.current;
     await deleteAnalysis(row);
     const rs = await listAnalyses();
-    setRows(rs);
-    setAgg(computeAggregates(rs));
+    if (requestIdRef.current !== requestId) return;
+    setHistory({ userId, rows: rs, agg: computeAggregates(rs) });
   }
 
   return (

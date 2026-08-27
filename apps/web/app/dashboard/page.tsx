@@ -39,14 +39,21 @@ function subscribeToQueryCount(onStoreChange: () => void): () => void {
 
 export default function DashboardPage() {
   const { user, authEnabled, loading } = useAuth();
-  const [rows, setRows] = useState<AnalysisRow[]>([]);
+  const [history, setHistory] = useState<{ userId: string; rows: AnalysisRow[] } | null>(null);
+  const rows = history && history.userId === user?.id ? history.rows : [];
   const queries = useSyncExternalStore(subscribeToQueryCount, getQueryCount, () => 0);
 
   const embed = process.env.NEXT_PUBLIC_THESYS_EMBED_URL || "";
 
   useEffect(() => {
-    if (user) listAnalyses().then(setRows);
-  }, [user]);
+    const userId = user?.id;
+    if (!userId) return;
+    let current = true;
+    void listAnalyses().then((nextRows) => {
+      if (current) setHistory({ userId, rows: nextRows });
+    });
+    return () => { current = false; };
+  }, [user?.id]);
 
   const remaining = Math.max(0, SESSION_QUERY_CAP - queries);
 
