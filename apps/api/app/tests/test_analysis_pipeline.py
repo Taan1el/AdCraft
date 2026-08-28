@@ -107,6 +107,12 @@ def test_pipeline_falls_back_to_base_response_on_invalid_model_output(monkeypatc
     from jsonschema import validate
 
     image = Image.new("RGB", (600, 315), "white")
+    calls = 0
+
+    def invalid_response(**_kwargs: object) -> str:
+        nonlocal calls
+        calls += 1
+        return "not json at all"
 
     monkeypatch.setattr(analysis_pipeline.settings, "mock_analysis", False)
     monkeypatch.setattr(analysis_pipeline.settings, "gemini_api_key", "test-key")
@@ -114,7 +120,7 @@ def test_pipeline_falls_back_to_base_response_on_invalid_model_output(monkeypatc
     monkeypatch.setattr(
         analysis_pipeline,
         "call_gemini_generate_content",
-        lambda **_kwargs: "not json at all",
+        invalid_response,
     )
 
     result = analysis_pipeline.run_analysis(
@@ -126,5 +132,39 @@ def test_pipeline_falls_back_to_base_response_on_invalid_model_output(monkeypatc
     )
 
     # Both attempts fail to parse, so the deterministic base response is served.
+    assert calls == 2
+    validate(instance=result, schema=ANALYSIS_RESPONSE_SCHEMA)
+    assert result["image"] == {"width": 600, "height": 315}
+
+
+def test_pipeline_does_not_retry_provider_failures(monkeypatch: MonkeyPatch) -> None:
+    from jsonschema import validate
+
+    image = Image.new("RGB", (600, 315), "white")
+    calls = 0
+
+    def provider_failure(**_kwargs: object) -> str:
+        nonlocal calls
+        calls += 1
+        raise analysis_pipeline.LLMError("provider unavailable")
+
+    monkeypatch.setattr(analysis_pipeline.settings, "mock_analysis", False)
+    monkeypatch.setattr(analysis_pipeline.settings, "gemini_api_key", "test-key")
+    monkeypatch.setattr(analysis_pipeline.settings, "openai_api_key", None)
+    monkeypatch.setattr(
+        analysis_pipeline,
+        "call_gemini_generate_content",
+        provider_failure,
+    )
+
+    result = analysis_pipeline.run_analysis(
+        image=image,
+        ad_type="display_ad",
+        campaign_goal=None,
+        audience=None,
+        brand_name=None,
+    )
+
+    assert calls == 1
     validate(instance=result, schema=ANALYSIS_RESPONSE_SCHEMA)
     assert result["image"] == {"width": 600, "height": 315}

@@ -160,7 +160,7 @@ def run_analysis(
 
     try:
         return _attempt()
-    except (LLMError, InvalidModelOutput) as e:
+    except InvalidModelOutput as e:
         try:
             return _attempt(
                 "Your previous output was invalid. Return ONLY one JSON object that matches the schema exactly. "
@@ -168,4 +168,9 @@ def run_analysis(
             )
         except (LLMError, InvalidModelOutput):
             return base_response
+    except LLMError:
+        # A repair prompt can fix malformed model output, but it cannot fix an
+        # authentication, rate-limit, or transport failure. Retrying those
+        # immediately duplicates cost/load and delays the deterministic fallback.
+        return base_response
 
