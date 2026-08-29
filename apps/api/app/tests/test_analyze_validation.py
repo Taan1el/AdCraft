@@ -2,10 +2,12 @@ from __future__ import annotations
 
 # `apps/api/conftest.py` sets MOCK_ANALYSIS=true before collection so /analyze stays offline.
 
+import asyncio
 from io import BytesIO
 
 from PIL import Image
 from pytest import MonkeyPatch
+from starlette.datastructures import FormData, UploadFile
 from starlette.testclient import TestClient
 
 from app.api.routes import analyze as analyze_route
@@ -79,6 +81,20 @@ def test_analyze_rejects_unreadable_image() -> None:
 
     assert res.status_code == 400
     assert res.json() == {"error": "Uploaded file is not a readable image"}
+
+
+def test_analyze_closes_uploaded_file_after_request() -> None:
+    upload = UploadFile(file=BytesIO(_png_bytes()), filename="test.png")
+    form = FormData([("file", upload), ("adType", "display_ad")])
+
+    class RequestWithForm:
+        async def form(self) -> FormData:
+            return form
+
+    response = asyncio.run(analyze_route.analyze(RequestWithForm()))  # type: ignore[arg-type]
+
+    assert response.status_code == 200
+    assert upload.file.closed is True
 
 
 def test_analyze_rejects_non_text_optional_context() -> None:

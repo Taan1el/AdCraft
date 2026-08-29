@@ -37,6 +37,16 @@ async def analyze(request: Request) -> JSONResponse:
         # for malformed bodies. Treat bad client input as a 400 instead of
         # letting it escape through Starlette as an internal server error.
         return JSONResponse({"error": "Malformed multipart form data"}, status_code=400)
+    try:
+        return await _analyze_form(form)
+    finally:
+        # FormData owns every UploadFile and its spooled temporary file. Close
+        # them on success and every validation error so repeated uploads cannot
+        # leak descriptors until process shutdown.
+        await form.close()
+
+
+async def _analyze_form(form: FormData) -> JSONResponse:
     upload = form.get("file")
     if not isinstance(upload, UploadFile):
         return JSONResponse({"error": "Missing file"}, status_code=400)
