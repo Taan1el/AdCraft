@@ -61,7 +61,8 @@ def test_output_rules_present() -> None:
     rules = payload["outputRules"]
     assert "JSON only" in rules["format"]
     assert "generic advice" in rules["specificity"].lower()
-    assert "0..1 normalized coordinates" in rules["annotations"]
+    for field in ("overallScore", "categoryScores", "annotations", "metrics"):
+        assert field in rules["groundTruth"]
 
 
 def test_schema_example_categories_match_rubric() -> None:

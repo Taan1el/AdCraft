@@ -89,6 +89,31 @@ def test_pipeline_pins_server_owned_fields_over_model_output(monkeypatch: Monkey
         "ctaSaliencyScore": metrics.cta_saliency_score,
     }
 
+    # Scores are derived from those same measurements. The model can narrate
+    # them, but it cannot substitute its schema-valid all-50 response.
+    assert result["overallScore"] == int(
+        round(
+            100
+            * (
+                0.25 * metrics.contrast_score
+                + 0.25 * (1.0 - metrics.visual_density)
+                + 0.25 * metrics.whitespace_ratio
+                + 0.25 * metrics.cta_saliency_score
+            )
+        )
+    )
+    assert result["categoryScores"] == {
+        "visualHierarchy": int(round(55 + 45 * (1.0 - metrics.visual_density))),
+        "ctaProminence": int(round(40 + 60 * metrics.cta_saliency_score)),
+        "copyClarity": 72,
+        "readability": int(round(45 + 55 * metrics.contrast_score)),
+        "layoutBalance": 70,
+        "trustSignals": 65,
+    }
+    assert result["categoryScores"] != {
+        key: 50 for key in result["categoryScores"]
+    }
+
     # analysisId is a fresh server-side uuid, not the model's made-up id.
     assert result["analysisId"] != "model-made-up-id"
 

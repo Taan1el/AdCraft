@@ -144,16 +144,15 @@ def run_analysis(
             raise LLMError("No LLM API key configured (set GEMINI_API_KEY or OPENAI_API_KEY).")
         data = parse_json_object(raw.strip())
         validate_analysis_response(data)
-        # The prompt asks the model to copy analysisId/image/metrics/annotations
-        # verbatim from baseResponse, but that instruction is unenforced and
-        # schema validation only checks shape. Pin these server-owned,
-        # deterministic fields so a hallucinated image size, fabricated metric,
-        # or drifted overlay box can't override the ground truth the rest of the
-        # app relies on. Annotations are overlays anchored to measured pixel
-        # regions (CTA candidate, clutter, low-contrast); the model's job is to
-        # write critique, not to move the boxes.
+        # The prompt asks the model to copy deterministic fields verbatim from
+        # baseResponse, but schema validation only checks shape. Pin them here so
+        # model drift cannot replace measured scores, metrics, image dimensions,
+        # or pixel-anchored overlays. The model's job is to write critique, not
+        # to rewrite the ground truth used by the rest of the app.
         data["analysisId"] = base_response["analysisId"]
         data["image"] = base_response["image"]
+        data["overallScore"] = base_response["overallScore"]
+        data["categoryScores"] = base_response["categoryScores"]
         data["metrics"] = base_response["metrics"]
         data["annotations"] = base_response["annotations"]
         return data

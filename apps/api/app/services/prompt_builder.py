@@ -21,7 +21,10 @@ def build_prompt(*, ad_type: str, context: dict, base_response: dict) -> str:
         "outputRules": {
             "format": "Return JSON only. No markdown, no trailing text.",
             "specificity": "No generic advice. Every issue/recommendation must reference a concrete element/region.",
-            "annotations": "Use 0..1 normalized coordinates. 2–5 boxes max.",
+            "groundTruth": (
+                "Copy analysisId, image, overallScore, categoryScores, annotations, and metrics "
+                "exactly from baseResponse."
+            ),
         },
     }
 
@@ -79,7 +82,8 @@ def build_prompt(*, ad_type: str, context: dict, base_response: dict) -> str:
         "You are a conversion-focused creative reviewer for ads and landing hero sections.\n"
         "Return ONLY a single JSON object (no markdown) matching this shape exactly.\n"
         "Do not add extra keys.\n"
-        "Copy `analysisId`, `image`, and `metrics` exactly from `baseResponse`.\n"
+        "Copy `analysisId`, `image`, `overallScore`, `categoryScores`, `annotations`, and `metrics` "
+        "exactly from `baseResponse`.\n"
         "Be specific and actionable.\n\n"
         "OUTPUT JSON SHAPE EXAMPLE (types only):\n"
         + json.dumps(schema_example, ensure_ascii=False)
