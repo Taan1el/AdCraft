@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 
 from PIL import Image, ImageOps, UnidentifiedImageError
+from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import FormData, UploadFile
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -94,7 +95,8 @@ async def _analyze_form(form: FormData) -> JSONResponse:
             status_code=503,
         )
 
-    result = run_analysis(
+    result = await run_in_threadpool(
+        run_analysis,
         image=image,
         ad_type=ad_type,
         campaign_goal=campaign_goal,

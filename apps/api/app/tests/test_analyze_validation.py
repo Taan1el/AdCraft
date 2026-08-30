@@ -3,8 +3,10 @@ from __future__ import annotations
 # `apps/api/conftest.py` sets MOCK_ANALYSIS=true before collection so /analyze stays offline.
 
 import asyncio
+import threading
 from io import BytesIO
 
+import httpx
 from PIL import Image
 from pytest import MonkeyPatch
 from starlette.datastructures import FormData, UploadFile
@@ -141,3 +143,41 @@ def test_analyze_applies_exif_orientation_before_analysis(monkeypatch: MonkeyPat
     bottom = captured["bottom_pixel"]
     assert isinstance(top, tuple) and top[0] > top[2]
     assert isinstance(bottom, tuple) and bottom[2] > bottom[0]
+
+
+def test_analyze_does_not_block_concurrent_health_request(monkeypatch: MonkeyPatch) -> None:
+    analysis_started = threading.Event()
+    release_analysis = threading.Event()
+
+    def gated_run_analysis(**_kwargs: object) -> dict[str, bool]:
+        analysis_started.set()
+        assert release_analysis.wait(timeout=2), "analysis release timed out"
+        return {"ok": True}
+
+    monkeypatch.setattr(analyze_route, "run_analysis", gated_run_analysis)
+
+    async def exercise_requests() -> None:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            analyze_task = asyncio.create_task(
+                client.post(
+                    "/analyze",
+                    files={"file": ("test.png", _png_bytes(), "image/png")},
+                    data={"adType": "display_ad"},
+                )
+            )
+            try:
+                started = await asyncio.wait_for(
+                    asyncio.to_thread(analysis_started.wait, 2),
+                    timeout=3,
+                )
+                assert started, "analysis did not start"
+                health_response = await asyncio.wait_for(client.get("/health"), timeout=1)
+                assert health_response.status_code == 200
+            finally:
+                release_analysis.set()
+
+            analyze_response = await asyncio.wait_for(analyze_task, timeout=3)
+            assert analyze_response.status_code == 200
+
+    asyncio.run(exercise_requests())
