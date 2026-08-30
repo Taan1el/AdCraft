@@ -1,3 +1,6 @@
+NON_BLANK_STRING = {"type": "string", "pattern": r"\S"}
+
+
 ANALYSIS_RESPONSE_SCHEMA: dict = {
     "type": "object",
     "additionalProperties": False,
@@ -21,7 +24,7 @@ ANALYSIS_RESPONSE_SCHEMA: dict = {
             "properties": {"width": {"type": "integer"}, "height": {"type": "integer"}},
         },
         "overallScore": {"type": "integer", "minimum": 0, "maximum": 100},
-        "summary": {"type": "string"},
+        "summary": NON_BLANK_STRING,
         "categoryScores": {
             "type": "object",
             "additionalProperties": False,
@@ -49,11 +52,11 @@ ANALYSIS_RESPONSE_SCHEMA: dict = {
                 "additionalProperties": False,
                 "required": ["id", "category", "severity", "title", "description"],
                 "properties": {
-                    "id": {"type": "string"},
-                    "category": {"type": "string"},
+                    "id": NON_BLANK_STRING,
+                    "category": NON_BLANK_STRING,
                     "severity": {"type": "string", "enum": ["low", "medium", "high"]},
-                    "title": {"type": "string"},
-                    "description": {"type": "string"},
+                    "title": NON_BLANK_STRING,
+                    "description": NON_BLANK_STRING,
                 },
             },
         },
@@ -64,11 +67,11 @@ ANALYSIS_RESPONSE_SCHEMA: dict = {
                 "additionalProperties": False,
                 "required": ["id", "category", "priority", "title", "action"],
                 "properties": {
-                    "id": {"type": "string"},
-                    "category": {"type": "string"},
+                    "id": NON_BLANK_STRING,
+                    "category": NON_BLANK_STRING,
                     "priority": {"type": "string", "enum": ["low", "medium", "high"]},
-                    "title": {"type": "string"},
-                    "action": {"type": "string"},
+                    "title": NON_BLANK_STRING,
+                    "action": NON_BLANK_STRING,
                 },
             },
         },

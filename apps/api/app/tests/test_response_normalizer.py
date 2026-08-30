@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import json
 
 import pytest
@@ -155,5 +156,33 @@ def test_validate_rejects_off_contract_issue_severity() -> None:
 def test_validate_rejects_off_contract_recommendation_priority() -> None:
     broken = _valid_response()
     broken["recommendations"][0]["priority"] = "urgent"
+    with pytest.raises(InvalidModelOutput, match="schema validation"):
+        validate_analysis_response(broken)
+
+
+@pytest.mark.parametrize(
+    ("section", "field"),
+    [
+        (None, "summary"),
+        ("issues", "id"),
+        ("issues", "category"),
+        ("issues", "title"),
+        ("issues", "description"),
+        ("recommendations", "id"),
+        ("recommendations", "category"),
+        ("recommendations", "title"),
+        ("recommendations", "action"),
+    ],
+)
+@pytest.mark.parametrize("blank", ["", " \t\n"])
+def test_validate_rejects_blank_model_owned_text(
+    section: str | None,
+    field: str,
+    blank: str,
+) -> None:
+    broken = deepcopy(_valid_response())
+    target = broken if section is None else broken[section][0]
+    target[field] = blank
+
     with pytest.raises(InvalidModelOutput, match="schema validation"):
         validate_analysis_response(broken)

@@ -162,6 +162,38 @@ def test_pipeline_falls_back_to_base_response_on_invalid_model_output(monkeypatc
     assert result["image"] == {"width": 600, "height": 315}
 
 
+def test_pipeline_retries_then_falls_back_on_blank_model_copy(monkeypatch: MonkeyPatch) -> None:
+    image = Image.new("RGB", (600, 315), "white")
+    calls = 0
+
+    def blank_response(**_kwargs: object) -> str:
+        nonlocal calls
+        calls += 1
+        response = json.loads(_model_response_with_bogus_ground_truth())
+        response["summary"] = "   "
+        return json.dumps(response)
+
+    monkeypatch.setattr(analysis_pipeline.settings, "mock_analysis", False)
+    monkeypatch.setattr(analysis_pipeline.settings, "gemini_api_key", "test-key")
+    monkeypatch.setattr(analysis_pipeline.settings, "openai_api_key", None)
+    monkeypatch.setattr(
+        analysis_pipeline,
+        "call_gemini_generate_content",
+        blank_response,
+    )
+
+    result = analysis_pipeline.run_analysis(
+        image=image,
+        ad_type="display_ad",
+        campaign_goal=None,
+        audience=None,
+        brand_name=None,
+    )
+
+    assert calls == 2
+    assert result["summary"].strip()
+
+
 def test_pipeline_does_not_retry_provider_failures(monkeypatch: MonkeyPatch) -> None:
     from jsonschema import validate
 
