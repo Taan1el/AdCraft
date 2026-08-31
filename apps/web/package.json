@@ -8,6 +8,7 @@
     "postbuild": "node ./scripts/postexport.mjs",
     "start": "next start",
     "lint": "eslint",
+    "test:heuristics": "node ../../scripts/test-web-heuristics.mts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

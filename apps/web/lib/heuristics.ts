@@ -100,8 +100,16 @@ function dominantPalette(d: ImageData, topN = 5): { color: RGB; count: number }[
     }));
 }
 
-function sobelEdgeRatio(d: ImageData): { ratio: number; topRatio: number; bottomRatio: number } {
+export function sobelEdgeRatio(
+  d: Pick<ImageData, "width" | "height" | "data">,
+): { ratio: number; topRatio: number; bottomRatio: number } {
   const { width: w, height: h, data } = d;
+  // A valid browser image can be only one or two pixels wide/high. There is no
+  // complete 3x3 Sobel neighborhood in that case, and the old denominator was
+  // zero or negative, turning every downstream score into NaN.
+  if (w < 3 || h < 3) {
+    return { ratio: 0, topRatio: 0, bottomRatio: 0 };
+  }
   // grayscale buffer
   const gray = new Uint8ClampedArray(w * h);
   for (let i = 0, j = 0; i < data.length; i += 4, j++) {
