@@ -32,6 +32,7 @@ export function UploadDropzone({
       <div
         role="button"
         tabIndex={0}
+        aria-disabled={disabled}
         onClick={() => !disabled && pick()}
         onKeyDown={(e) => {
           if (disabled) return;
@@ -69,6 +70,7 @@ export function UploadDropzone({
             {value ? (
               <button
                 type="button"
+                disabled={disabled}
                 onClick={(e) => {
                   e.stopPropagation();
                   onChange(null);
@@ -80,6 +82,7 @@ export function UploadDropzone({
             ) : null}
             <button
               type="button"
+              disabled={disabled}
               onClick={(e) => {
                 e.stopPropagation();
                 pick();
@@ -110,6 +113,7 @@ export function UploadDropzone({
       <input
         ref={inputRef}
         type="file"
+        disabled={disabled}
         accept="image/png,image/jpeg,image/webp"
         className="hidden"
         onChange={(e) => onChange(e.target.files?.[0] || null)}
