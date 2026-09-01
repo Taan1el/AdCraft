@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export function UploadDropzone({
   value,
@@ -13,11 +13,14 @@ export function UploadDropzone({
   disabled?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const previewRef = useRef<HTMLImageElement | null>(null);
   const [dragOver, setDragOver] = useState(false);
 
-  const previewUrl = useMemo(() => {
-    if (!value) return null;
-    return URL.createObjectURL(value);
+  useEffect(() => {
+    if (!value || !previewRef.current) return;
+    const previewUrl = URL.createObjectURL(value);
+    previewRef.current.src = previewUrl;
+    return () => URL.revokeObjectURL(previewUrl);
   }, [value]);
 
   function pick() {
@@ -88,11 +91,11 @@ export function UploadDropzone({
           </div>
         </div>
 
-        {previewUrl ? (
+        {value ? (
           <div className="mt-4 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={previewUrl}
+              ref={previewRef}
               alt="Uploaded creative preview"
               className="h-56 w-full object-contain"
             />
