@@ -25,4 +25,14 @@ const nonText = await analyze(uploadForm(fileField));
 assert.equal(nonText.status, 400);
 assert.equal((await nonText.json() as { error?: string }).error, "Invalid adType");
 
-console.log("Worker request validation tests passed.");
+const corsResponse = await worker.fetch(
+  new Request("https://worker.test/health", {
+    headers: { origin: "https://client.test" },
+  }),
+  { ALLOWED_ORIGINS: " https://client.test/, https://client.test " },
+);
+assert.equal(corsResponse.status, 200);
+assert.equal(corsResponse.headers.get("access-control-allow-origin"), "https://client.test");
+assert.equal(corsResponse.headers.get("vary"), "origin");
+
+console.log("Worker request and CORS tests passed.");

@@ -76,10 +76,12 @@ function json(data: unknown, init?: ResponseInit) {
 function allowedOrigins(env: Env): string[] {
   const raw = (env.ALLOWED_ORIGINS || "").trim();
   if (!raw) return [];
-  return raw
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  return [...new Set(
+    raw
+      .split(",")
+      .map((s) => s.trim().replace(/\/+$/, ""))
+      .filter(Boolean),
+  )];
 }
 
 function withCors(req: Request, env: Env, res: Response): Response {
