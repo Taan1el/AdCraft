@@ -302,14 +302,14 @@ export default {
       }
       const file = form.get("file");
       const adTypeRaw = form.get("adType");
-      const adType = typeof adTypeRaw === "string" ? adTypeRaw : "display_ad";
-      if (!ALLOWED_AD_TYPES.has(adType as AdType)) {
+      if (typeof adTypeRaw !== "string" || !ALLOWED_AD_TYPES.has(adTypeRaw as AdType)) {
         return withCors(
           req,
           env,
           json({ error: "Invalid adType", allowed: [...ALLOWED_AD_TYPES] }, { status: 400 })
         );
       }
+      const adType = adTypeRaw as AdType;
 
       const isBlobLike = !!file && typeof file === "object" && typeof (file as any).arrayBuffer === "function";
       if (!isBlobLike) {
@@ -327,8 +327,8 @@ export default {
       }
       const { width, height } = await getImageSize(f);
 
-      const scores = scoreFromHeuristics({ width, height, bytes, adType: adType as AdType });
-      const { issues, recommendations } = buildIssuesAndRecs({ scores, adType: adType as AdType, width, height });
+      const scores = scoreFromHeuristics({ width, height, bytes, adType });
+      const { issues, recommendations } = buildIssuesAndRecs({ scores, adType, width, height });
 
       const annotations: AnalysisResponse["annotations"] =
         width && height
