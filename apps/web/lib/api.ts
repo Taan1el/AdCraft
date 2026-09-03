@@ -1,5 +1,6 @@
 import type { AdType, AnalysisResponse } from "@/lib/types";
 import { analyzeLocally } from "@/lib/heuristics";
+import { normalizeApiBase } from "@/lib/api-config";
 
 export type AnalyzeInput = {
   file: File;
@@ -31,11 +32,8 @@ class RemoteAnalyzeError extends Error {
 }
 
 function apiBase(): string | null {
-  // explicit empty string disables the backend and forces local heuristic mode
-  const v = process.env.NEXT_PUBLIC_API_URL;
-  if (v === "") return null;
-  const b = (v || "http://127.0.0.1:8010").trim().replace(/\/$/, "");
-  return b;
+  // Explicitly blank values disable the backend and force local heuristic mode.
+  return normalizeApiBase(process.env.NEXT_PUBLIC_API_URL);
 }
 
 /** Tells the UI whether a remote call would be attempted at all. */
