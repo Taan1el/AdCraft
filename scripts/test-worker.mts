@@ -25,6 +25,23 @@ const nonText = await analyze(uploadForm(fileField));
 assert.equal(nonText.status, 400);
 assert.equal((await nonText.json() as { error?: string }).error, "Invalid adType");
 
+const emptyForm = new FormData();
+emptyForm.set("file", new File([], "empty.png", { type: "image/png" }));
+emptyForm.set("adType", "display_ad");
+const empty = await analyze(emptyForm);
+assert.equal(empty.status, 400);
+assert.equal((await empty.json() as { error?: string }).error, "Uploaded file is empty");
+
+const unsupportedForm = new FormData();
+unsupportedForm.set("file", new File(["not an image"], "creative.txt", { type: "text/plain" }));
+unsupportedForm.set("adType", "display_ad");
+const unsupported = await analyze(unsupportedForm);
+assert.equal(unsupported.status, 400);
+assert.deepEqual(await unsupported.json(), {
+  error: "Unsupported image type",
+  allowed: ["image/png", "image/jpeg", "image/webp"],
+});
+
 const corsResponse = await worker.fetch(
   new Request("https://worker.test/health", {
     headers: { origin: "https://client.test" },
