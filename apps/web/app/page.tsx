@@ -100,8 +100,7 @@ export default function Home() {
       if (analysisRunRef.current !== runId) return;
       setOutcome(out);
       if (user) {
-        const source: "local" | "gemini" = out.source === "remote" ? "gemini" : "local";
-        void saveAnalysis({ file: f, adType, result: out.result, source });
+        void saveAnalysis({ file: f, adType, result: out.result, source: out.source });
       }
     } catch (e) {
       if (analysisRunRef.current === runId) {

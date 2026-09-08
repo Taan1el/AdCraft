@@ -14,7 +14,7 @@ export type AnalysisRow = {
   scores: AnalysisResponse["categoryScores"];
   metrics: AnalysisResponse["metrics"];
   summary: string | null;
-  source: "local" | "gemini";
+  source: "local" | "remote" | "gemini";
   signedImageUrl?: string;
 };
 
@@ -25,7 +25,7 @@ export async function saveAnalysis(opts: {
   file: File;
   adType: AdType;
   result: AnalysisResponse;
-  source: "local" | "gemini";
+  source: "local" | "remote";
 }): Promise<{ saved: boolean; error?: string }> {
   const sb = getSupabase();
   if (!sb) return { saved: false };

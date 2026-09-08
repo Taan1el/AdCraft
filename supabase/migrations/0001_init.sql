@@ -14,7 +14,7 @@ create table if not exists public.analyses (
   scores       jsonb not null,              -- CategoryScores
   metrics      jsonb not null,              -- whitespace, density, contrast, ctaSaliency
   summary      text,
-  source       text not null default 'local'  -- 'local' | 'gemini'
+  source       text not null default 'local'  -- 'local' | 'remote' (legacy rows may say 'gemini')
 );
 
 create index if not exists analyses_user_created_idx
