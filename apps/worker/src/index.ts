@@ -64,6 +64,28 @@ const ALLOWED_AD_TYPES = new Set<AdType>(["display_ad", "landing_hero", "email_h
 const ALLOWED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 
+async function imageSignatureMatches(file: File, imageType: string): Promise<boolean> {
+  try {
+    const bytes = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+    if (imageType === "image/png") {
+      const png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+      return png.every((value, index) => bytes[index] === value);
+    }
+    if (imageType === "image/jpeg") {
+      return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+    }
+    if (imageType === "image/webp") {
+      return (
+        bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+        bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50
+      );
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 function json(data: unknown, init?: ResponseInit) {
   return new Response(JSON.stringify(data), {
     ...init,
@@ -337,6 +359,13 @@ export default {
           req,
           env,
           json({ error: "Unsupported image type", allowed: [...ALLOWED_IMAGE_TYPES] }, { status: 400 })
+        );
+      }
+      if (!(await imageSignatureMatches(f, imageType))) {
+        return withCors(
+          req,
+          env,
+          json({ error: "Uploaded file signature does not match its image type" }, { status: 400 })
         );
       }
       const { width, height } = await getImageSize(f);

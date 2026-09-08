@@ -16,6 +16,19 @@ async function analyze(form: FormData): Promise<Response> {
   );
 }
 
+const validSignatures = [
+  { type: "image/png", bytes: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] },
+  { type: "image/jpeg", bytes: [0xff, 0xd8, 0xff] },
+  { type: "image/webp", bytes: [0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50] },
+];
+
+for (const { type, bytes } of validSignatures) {
+  const form = new FormData();
+  form.set("file", new File([new Uint8Array(bytes)], "creative", { type }));
+  form.set("adType", "display_ad");
+  assert.equal((await analyze(form)).status, 200, `${type} signature should be accepted`);
+}
+
 const missing = await analyze(uploadForm());
 assert.equal(missing.status, 400);
 assert.equal((await missing.json() as { error?: string }).error, "Invalid adType");
@@ -41,6 +54,19 @@ assert.deepEqual(await unsupported.json(), {
   error: "Unsupported image type",
   allowed: ["image/png", "image/jpeg", "image/webp"],
 });
+
+const spoofedForm = new FormData();
+spoofedForm.set(
+  "file",
+  new File([new Uint8Array([0xff, 0xd8, 0xff])], "creative.png", { type: "image/png" }),
+);
+spoofedForm.set("adType", "display_ad");
+const spoofed = await analyze(spoofedForm);
+assert.equal(spoofed.status, 400);
+assert.equal(
+  (await spoofed.json() as { error?: string }).error,
+  "Uploaded file signature does not match its image type",
+);
 
 const corsResponse = await worker.fetch(
   new Request("https://worker.test/health", {
