@@ -19,6 +19,55 @@ def _response_json(provider: str, response: httpx.Response) -> Any:
         raise LLMError(f"{provider} returned invalid JSON") from e
 
 
+def _openai_no_text_reason(data: dict[str, Any]) -> str | None:
+    """Explain why an OpenAI Responses body carried no usable text.
+
+    An empty output is usually not a bug in our extraction but a signal from the
+    API: a top-level error, a truncated ("incomplete") response, or a model
+    refusal. Surfacing that reason turns a bare "could not extract" into
+    something actionable in logs instead of silently falling back.
+    """
+    err = data.get("error")
+    if isinstance(err, dict) and isinstance(err.get("message"), str) and err["message"]:
+        return f"error: {err['message'][:200]}"
+    if data.get("status") == "incomplete":
+        details = data.get("incomplete_details")
+        reason = details.get("reason") if isinstance(details, dict) else None
+        return f"incomplete: {reason}" if isinstance(reason, str) and reason else "incomplete"
+    output = data.get("output")
+    if isinstance(output, list):
+        for item in output:
+            content = item.get("content") if isinstance(item, dict) else None
+            if not isinstance(content, list):
+                continue
+            for c in content:
+                if isinstance(c, dict) and c.get("type") == "refusal":
+                    refusal = c.get("refusal")
+                    if isinstance(refusal, str) and refusal:
+                        return f"refusal: {refusal[:200]}"
+    return None
+
+
+def _gemini_no_text_reason(data: dict[str, Any]) -> str | None:
+    """Explain why a Gemini generateContent body carried no usable text.
+
+    A prompt-level block (``promptFeedback.blockReason``) or a candidate
+    ``finishReason`` (SAFETY, MAX_TOKENS, RECITATION) is the real cause far more
+    often than a malformed shape, and it is otherwise thrown away.
+    """
+    feedback = data.get("promptFeedback")
+    if isinstance(feedback, dict):
+        block = feedback.get("blockReason")
+        if isinstance(block, str) and block:
+            return f"blockReason={block}"
+    candidates = data.get("candidates")
+    if isinstance(candidates, list) and candidates and isinstance(candidates[0], dict):
+        finish = candidates[0].get("finishReason")
+        if isinstance(finish, str) and finish:
+            return f"finishReason={finish}"
+    return None
+
+
 def _image_to_data_url(image: Image.Image) -> str:
     from io import BytesIO
 
@@ -80,7 +129,9 @@ def call_openai_responses_api(
             if texts:
                 return "\n".join(texts)
 
-    raise LLMError("Could not extract output text from OpenAI response")
+    reason = _openai_no_text_reason(data) if isinstance(data, dict) else None
+    suffix = f" ({reason})" if reason else ""
+    raise LLMError(f"Could not extract output text from OpenAI response{suffix}")
 
 
 def _image_to_inline_data(image: Image.Image) -> dict[str, str]:
@@ -133,21 +184,20 @@ def call_gemini_generate_content(
     # an opaque AttributeError instead of a clean provider error.
     if not isinstance(data, dict):
         raise LLMError("Gemini returned unexpected JSON shape (expected an object)")
-    try:
-        candidates = data.get("candidates", [])
-        if not candidates:
-            raise KeyError("candidates missing")
-        content = candidates[0].get("content", {})
-        parts = content.get("parts", [])
-        texts = []
-        for p in parts:
-            t = p.get("text") if isinstance(p, dict) else None
-            if isinstance(t, str):
-                texts.append(t)
-        if texts:
-            return "\n".join(texts)
-    except Exception as e:  # noqa: BLE001
-        raise LLMError(f"Could not extract text from Gemini response: {e}") from e
 
-    raise LLMError("Could not extract text from Gemini response")
+    candidates = data.get("candidates")
+    if isinstance(candidates, list) and candidates and isinstance(candidates[0], dict):
+        content = candidates[0].get("content")
+        parts = content.get("parts") if isinstance(content, dict) else None
+        if isinstance(parts, list):
+            texts = [p["text"] for p in parts if isinstance(p, dict) and isinstance(p.get("text"), str)]
+            if texts:
+                return "\n".join(texts)
+
+    # No usable text. Prefer the API's own reason (safety block, truncation)
+    # over a bare message, and guard every access above with isinstance so a
+    # non-dict candidate/content can never surface as an opaque AttributeError.
+    reason = _gemini_no_text_reason(data)
+    suffix = f" ({reason})" if reason else ""
+    raise LLMError(f"Could not extract text from Gemini response{suffix}")
 

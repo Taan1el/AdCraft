@@ -216,6 +216,72 @@ def test_gemini_missing_candidates_is_wrapped(monkeypatch: MonkeyPatch) -> None:
         )
 
 
+def test_openai_incomplete_response_surfaces_reason(monkeypatch: MonkeyPatch) -> None:
+    # A truncated response carries no output text but says why via
+    # incomplete_details; that reason must reach the error message.
+    body = {"status": "incomplete", "incomplete_details": {"reason": "max_output_tokens"}, "output": []}
+    request = httpx.Request("POST", "https://api.openai.com/v1/responses")
+    response = httpx.Response(200, content=json.dumps(body), request=request)
+    _patch_client(monkeypatch, _FakeClient(response))
+
+    with pytest.raises(LLMError, match=r"incomplete: max_output_tokens"):
+        llm_client.call_openai_responses_api(
+            api_key="k", model="m", prompt_text="p", image=_tiny_image()
+        )
+
+
+def test_openai_refusal_surfaces_reason(monkeypatch: MonkeyPatch) -> None:
+    body = {"output": [{"content": [{"type": "refusal", "refusal": "I can't help with that."}]}]}
+    request = httpx.Request("POST", "https://api.openai.com/v1/responses")
+    response = httpx.Response(200, content=json.dumps(body), request=request)
+    _patch_client(monkeypatch, _FakeClient(response))
+
+    with pytest.raises(LLMError, match=r"refusal: I can't help"):
+        llm_client.call_openai_responses_api(
+            api_key="k", model="m", prompt_text="p", image=_tiny_image()
+        )
+
+
+def test_gemini_safety_finish_reason_surfaces(monkeypatch: MonkeyPatch) -> None:
+    # A candidate blocked for safety has no text parts; the finishReason is the
+    # actionable signal and must appear in the raised error.
+    body = {"candidates": [{"finishReason": "SAFETY", "content": {"parts": []}}]}
+    request = httpx.Request("POST", "https://generativelanguage.googleapis.com")
+    response = httpx.Response(200, content=json.dumps(body), request=request)
+    _patch_client(monkeypatch, _FakeClient(response))
+
+    with pytest.raises(LLMError, match=r"finishReason=SAFETY"):
+        llm_client.call_gemini_generate_content(
+            api_key="k", model="m", prompt_text="p", image=_tiny_image()
+        )
+
+
+def test_gemini_prompt_block_reason_surfaces(monkeypatch: MonkeyPatch) -> None:
+    body = {"promptFeedback": {"blockReason": "SAFETY"}, "candidates": []}
+    request = httpx.Request("POST", "https://generativelanguage.googleapis.com")
+    response = httpx.Response(200, content=json.dumps(body), request=request)
+    _patch_client(monkeypatch, _FakeClient(response))
+
+    with pytest.raises(LLMError, match=r"blockReason=SAFETY"):
+        llm_client.call_gemini_generate_content(
+            api_key="k", model="m", prompt_text="p", image=_tiny_image()
+        )
+
+
+def test_gemini_non_dict_candidate_does_not_leak_attribute_error(monkeypatch: MonkeyPatch) -> None:
+    # A candidate that is a bare string must not raise AttributeError from .get.
+    body = {"candidates": ["unexpected"]}
+    request = httpx.Request("POST", "https://generativelanguage.googleapis.com")
+    response = httpx.Response(200, content=json.dumps(body), request=request)
+    _patch_client(monkeypatch, _FakeClient(response))
+
+    with pytest.raises(LLMError) as exc_info:
+        llm_client.call_gemini_generate_content(
+            api_key="k", model="m", prompt_text="p", image=_tiny_image()
+        )
+    assert "has no attribute" not in str(exc_info.value)
+
+
 def test_gemini_http_error_status_is_wrapped(monkeypatch: MonkeyPatch) -> None:
     request = httpx.Request("POST", "https://generativelanguage.googleapis.com")
     response = httpx.Response(429, text="rate limited", request=request)
