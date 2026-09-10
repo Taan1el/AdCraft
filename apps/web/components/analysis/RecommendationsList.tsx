@@ -1,6 +1,7 @@
 "use client";
 
 import type { Recommendation } from "@/lib/types";
+import { categoryLabel } from "@/lib/categories";
 
 export function RecommendationsList({ items }: { items: Recommendation[] }) {
   return (
@@ -20,7 +21,7 @@ export function RecommendationsList({ items }: { items: Recommendation[] }) {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-sm font-semibold text-zinc-900">{r.title}</div>
-                  <div className="text-xs text-zinc-500">{r.category}</div>
+                  <div className="text-xs text-zinc-500">{categoryLabel(r.category)}</div>
                 </div>
                 <div className="rounded-full bg-zinc-100 px-2 py-1 text-xs font-semibold text-zinc-700">
                   {r.priority}

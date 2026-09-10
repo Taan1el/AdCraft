@@ -5,15 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { listAnalyses, computeAggregates, deleteAnalysis, type AnalysisRow, type Aggregates } from "@/lib/history";
 import { AuthMenu } from "@/components/AuthMenu";
-
-const CATEGORY_LABELS: Record<string, string> = {
-  visualHierarchy: "Visual hierarchy",
-  ctaProminence: "CTA prominence",
-  copyClarity: "Copy clarity",
-  readability: "Readability",
-  layoutBalance: "Layout balance",
-  trustSignals: "Trust signals",
-};
+import { categoryLabel } from "@/lib/categories";
 
 function scoreColor(v: number) {
   if (v >= 80) return "#3b82f6";
@@ -138,7 +130,7 @@ function AggregatesPanel({ agg }: { agg: Aggregates }) {
       <Stat label="Best overall" value={agg.best ? String(agg.best.overall) : "—"} accent="#3b82f6" />
       <Stat label="Worst overall" value={agg.worst ? String(agg.worst.overall) : "—"} accent="#f87171" />
       {(Object.keys(agg.averagesByCategory) as (keyof typeof agg.averagesByCategory)[]).map((k) => (
-        <Stat key={k} label={`Avg ${CATEGORY_LABELS[k] ?? k}`} value={String(agg.averagesByCategory[k])} accent={scoreColor(agg.averagesByCategory[k])} />
+        <Stat key={k} label={`Avg ${categoryLabel(k)}`} value={String(agg.averagesByCategory[k])} accent={scoreColor(agg.averagesByCategory[k])} />
       ))}
     </div>
   );
