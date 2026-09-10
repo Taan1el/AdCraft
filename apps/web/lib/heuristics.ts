@@ -282,7 +282,7 @@ function deriveScores(m: Metrics, adType: AdType): CategoryScores {
   };
 }
 
-function buildIssues(m: Metrics, scores: CategoryScores): Issue[] {
+export function buildIssues(m: Metrics, scores: CategoryScores): Issue[] {
   const out: Issue[] = [];
 
   if (m.contrastScore < 4.5) {
@@ -350,7 +350,7 @@ function buildIssues(m: Metrics, scores: CategoryScores): Issue[] {
   return out;
 }
 
-function buildRecommendations(m: Metrics, scores: CategoryScores): Recommendation[] {
+export function buildRecommendations(m: Metrics, scores: CategoryScores): Recommendation[] {
   const out: Recommendation[] = [];
 
   if (m.contrastScore < 7) {
