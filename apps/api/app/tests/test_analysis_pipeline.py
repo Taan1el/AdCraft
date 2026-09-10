@@ -128,6 +128,32 @@ def test_pipeline_pins_server_owned_fields_over_model_output(monkeypatch: Monkey
     assert all(a["id"] != "ann_model_moved" for a in result["annotations"])
 
 
+def test_deterministic_issue_categories_match_category_taxonomy(monkeypatch: MonkeyPatch) -> None:
+    """Every deterministic issue/rec category must be a real categoryScores key.
+
+    A solid-white image scores 0 contrast and 0 CTA saliency, so both the
+    low-contrast and weak-CTA branches fire. Their `category` has to match the
+    camelCase keys used by categoryScores, the rubric, and the frontend — a
+    snake_case value like "cta_prominence" renders raw and breaks any consumer
+    that groups issues under their category score.
+    """
+    image = Image.new("RGB", (600, 315), "white")
+    monkeypatch.setattr(analysis_pipeline.settings, "mock_analysis", True)
+
+    result = analysis_pipeline.run_analysis(
+        image=image,
+        ad_type="display_ad",
+        campaign_goal=None,
+        audience=None,
+        brand_name=None,
+    )
+
+    valid_categories = set(result["categoryScores"])
+    assert result["issues"] and result["recommendations"]
+    for entry in [*result["issues"], *result["recommendations"]]:
+        assert entry["category"] in valid_categories, entry["category"]
+
+
 def test_pipeline_falls_back_to_base_response_on_invalid_model_output(monkeypatch: MonkeyPatch) -> None:
     from jsonschema import validate
 

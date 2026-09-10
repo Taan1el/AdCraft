@@ -78,7 +78,7 @@ def run_analysis(
         issues.append(
             {
                 "id": "issue_cta_weak",
-                "category": "cta_prominence",
+                "category": "ctaProminence",
                 "severity": "high",
                 "title": "CTA is not visually dominant",
                 "description": "The CTA likely competes with nearby elements, lowering click priority.",
@@ -87,7 +87,7 @@ def run_analysis(
         recs.append(
             {
                 "id": "rec_cta_separation",
-                "category": "cta_prominence",
+                "category": "ctaProminence",
                 "priority": "high",
                 "title": "Increase CTA separation",
                 "action": "Add whitespace around the button, increase contrast, and reduce competing elements in the same region.",
