@@ -154,6 +154,58 @@ def test_deterministic_issue_categories_match_category_taxonomy(monkeypatch: Mon
         assert entry["category"] in valid_categories, entry["category"]
 
 
+def _checkerboard(width: int = 600, height: int = 315, cell: int = 4) -> Image.Image:
+    """A high-frequency checkerboard: maximal edge density -> a cluttered frame."""
+    image = Image.new("RGB", (width, height), "white")
+    for y in range(height):
+        for x in range(width):
+            if (x // cell + y // cell) % 2 == 0:
+                image.putpixel((x, y), (0, 0, 0))
+    return image
+
+
+def test_high_density_image_flags_visual_clutter(monkeypatch: MonkeyPatch) -> None:
+    """A busy frame should surface a clutter issue + recommendation, not just a
+    silent visualHierarchy score penalty and an unexplained overlay."""
+    image = _checkerboard()
+    monkeypatch.setattr(analysis_pipeline.settings, "mock_analysis", True)
+
+    metrics, _ = compute_deterministic_metrics(image)
+    assert metrics.visual_density > 0.4  # guards the threshold this test relies on
+
+    result = analysis_pipeline.run_analysis(
+        image=image,
+        ad_type="display_ad",
+        campaign_goal=None,
+        audience=None,
+        brand_name=None,
+    )
+
+    issue = next((i for i in result["issues"] if i["id"] == "issue_visual_clutter"), None)
+    rec = next((r for r in result["recommendations"] if r["id"] == "rec_reduce_clutter"), None)
+    assert issue is not None and rec is not None
+    assert issue["category"] == "visualHierarchy"
+    assert rec["category"] == "visualHierarchy"
+    assert issue["category"] in set(result["categoryScores"])
+
+
+def test_clean_image_does_not_flag_visual_clutter(monkeypatch: MonkeyPatch) -> None:
+    """A near-empty frame is low density; the clutter branch must stay silent."""
+    image = Image.new("RGB", (600, 315), "white")
+    monkeypatch.setattr(analysis_pipeline.settings, "mock_analysis", True)
+
+    result = analysis_pipeline.run_analysis(
+        image=image,
+        ad_type="display_ad",
+        campaign_goal=None,
+        audience=None,
+        brand_name=None,
+    )
+
+    assert all(i["id"] != "issue_visual_clutter" for i in result["issues"])
+    assert all(r["id"] != "rec_reduce_clutter" for r in result["recommendations"])
+
+
 def test_pipeline_falls_back_to_base_response_on_invalid_model_output(monkeypatch: MonkeyPatch) -> None:
     from jsonschema import validate
 

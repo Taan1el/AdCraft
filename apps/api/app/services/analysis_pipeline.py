@@ -94,6 +94,33 @@ def run_analysis(
             }
         )
 
+    # High edge density means a busy, cluttered frame. This already costs the
+    # creative up to 25% of the overall score and 45 points of visualHierarchy
+    # (both derived from 1 - visual_density), and compute_deterministic_metrics
+    # emits an "ann_clutter" overlay for the busiest region — but until now no
+    # issue/recommendation explained that penalty, so the annotation had no
+    # matching text. The threshold sits well above typical text-heavy layouts
+    # (~0.15) so only genuinely noisy frames trip it.
+    if metrics.visual_density > 0.4:
+        issues.append(
+            {
+                "id": "issue_visual_clutter",
+                "category": "visualHierarchy",
+                "severity": "medium",
+                "title": "Busy layout weakens visual hierarchy",
+                "description": "High element density competes for attention, making it harder for the eye to find the primary message.",
+            }
+        )
+        recs.append(
+            {
+                "id": "rec_reduce_clutter",
+                "category": "visualHierarchy",
+                "priority": "medium",
+                "title": "Reduce clutter around the focal point",
+                "action": "Trim secondary elements, group related content, and add whitespace so the primary message and CTA stand out.",
+            }
+        )
+
     summary = (
         f"Mock analysis for {ad_type}. This score is grounded in basic visual metrics "
         f"(contrast, density, whitespace, CTA saliency). Enable real AI critique by adding an API key."
