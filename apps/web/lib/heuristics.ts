@@ -118,6 +118,8 @@ export function sobelEdgeRatio(
   let edges = 0;
   let topEdges = 0;
   let bottomEdges = 0;
+  let topPixels = 0;
+  let bottomPixels = 0;
   const halfH = h >> 1;
   // 3x3 Sobel
   for (let y = 1; y < h - 1; y++) {
@@ -130,6 +132,8 @@ export function sobelEdgeRatio(
         -gray[i - w - 1] - 2 * gray[i - w] - gray[i - w + 1] +
         gray[i + w - 1] + 2 * gray[i + w] + gray[i + w + 1];
       const mag = Math.abs(gx) + Math.abs(gy);
+      if (y < halfH) topPixels++;
+      else bottomPixels++;
       if (mag > 80) {
         edges++;
         if (y < halfH) topEdges++;
@@ -138,11 +142,10 @@ export function sobelEdgeRatio(
     }
   }
   const total = (w - 2) * (h - 2);
-  const halfTotal = total / 2;
   return {
     ratio: edges / total,
-    topRatio: topEdges / halfTotal,
-    bottomRatio: bottomEdges / halfTotal,
+    topRatio: topPixels ? topEdges / topPixels : 0,
+    bottomRatio: bottomPixels ? bottomEdges / bottomPixels : 0,
   };
 }
 

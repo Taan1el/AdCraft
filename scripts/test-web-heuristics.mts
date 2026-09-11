@@ -27,6 +27,21 @@ const regular = sobelEdgeRatio({
 });
 assert.ok(Object.values(regular).every(Number.isFinite), "regular edge ratios must stay finite");
 
+const oddHeightData = new Uint8ClampedArray(3 * 5 * 4);
+for (let y = 0; y < 5; y++) {
+  const value = [0, 0, 255, 255, 0][y];
+  for (let x = 0; x < 3; x++) {
+    const offset = (y * 3 + x) * 4;
+    oddHeightData.set([value, value, value, 255], offset);
+  }
+}
+const oddHeight = sobelEdgeRatio({ width: 3, height: 5, data: oddHeightData });
+assert.deepEqual(
+  oddHeight,
+  { ratio: 1, topRatio: 1, bottomRatio: 1 },
+  "odd-height region ratios must use their actual pixel counts",
+);
+
 console.log("Heuristic edge-ratio tests passed.");
 
 // ---------------------------------------------------------------------------
