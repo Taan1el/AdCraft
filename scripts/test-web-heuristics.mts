@@ -54,8 +54,10 @@ const baseMetrics = {
   width: 1200,
   height: 628,
   aspectRatio: 1200 / 628,
-  brightnessMean: 128,
-  brightnessStd: 40,
+  // brightnessMean/Std are normalized 0-1 (measureBrightness); 0.5 sits in the
+  // healthy exposure band so it triggers neither the dark nor washed-out branch.
+  brightnessMean: 0.5,
+  brightnessStd: 0.16,
   paletteSize: 6,
 };
 
@@ -121,6 +123,29 @@ const fixtures = [
       trustSignals: 78,
     },
   },
+  {
+    // Under-exposed frame: exercises the brightness-extreme issue and the
+    // fix-exposure recommendation while other metrics stay healthy.
+    metrics: {
+      ...baseMetrics,
+      brightnessMean: 0.05,
+      brightnessStd: 0.04,
+      whitespaceRatio: 0.3,
+      visualDensity: 0.12,
+      contrastScore: 8,
+      ctaSaliencyScore: 0.9,
+      topRegionDensity: 0.3,
+      bottomRegionDensity: 0.1,
+    },
+    scores: {
+      visualHierarchy: 85,
+      ctaProminence: 80,
+      copyClarity: 82,
+      readability: 95,
+      layoutBalance: 80,
+      trustSignals: 40,
+    },
+  },
 ];
 
 const seenIssueIds = new Set<string>();
@@ -157,10 +182,10 @@ for (const { metrics, scores } of fixtures) {
 
 // The fixtures are meant to reach every branch; if a builder grows a new one it
 // should come with a fixture that covers it (and proves its taxonomy is valid).
-for (const id of ["contrast-low", "whitespace-low", "whitespace-high", "density-high", "cta-weak", "hierarchy-flat"]) {
+for (const id of ["contrast-low", "whitespace-low", "whitespace-high", "density-high", "cta-weak", "hierarchy-flat", "brightness-extreme"]) {
   assert.ok(seenIssueIds.has(id), `no fixture triggered issue "${id}"`);
 }
-for (const id of ["boost-contrast", "stronger-cta", "reduce-clutter", "add-padding", "ab-test"]) {
+for (const id of ["boost-contrast", "stronger-cta", "reduce-clutter", "add-padding", "ab-test", "fix-exposure"]) {
   assert.ok(seenRecIds.has(id), `no fixture triggered recommendation "${id}"`);
 }
 

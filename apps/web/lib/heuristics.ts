@@ -347,6 +347,21 @@ export function buildIssues(m: Metrics, scores: CategoryScores): Issue[] {
     });
   }
 
+  // brightnessMean is normalized 0-1 (see measureBrightness). Polished ads sit
+  // in a ~0.3-0.75 band; the extremes read as under- or over-exposed on a phone.
+  if (m.brightnessMean < 0.12 || m.brightnessMean > 0.9) {
+    const tooDark = m.brightnessMean < 0.12;
+    out.push({
+      id: "brightness-extreme",
+      category: "trustSignals",
+      severity: "medium",
+      title: tooDark ? "Image reads as very dark" : "Image looks washed out",
+      description: tooDark
+        ? "Average brightness is very low, so text and product detail can disappear on dim or auto-dimmed phone screens. Lift the exposure or add a lighter panel behind key content."
+        : "Average brightness is near white, so the creative can look overexposed and low-contrast in-feed. Pull the exposure down or add a darker anchor to give the eye something to hold.",
+    });
+  }
+
   return out;
 }
 
@@ -393,6 +408,19 @@ export function buildRecommendations(m: Metrics, scores: CategoryScores): Recomm
       priority: "medium",
       title: "Add breathing room",
       action: "Increase padding around the headline and CTA. Negative space is what makes the focal element feel important.",
+    });
+  }
+
+  if (m.brightnessMean < 0.15 || m.brightnessMean > 0.88) {
+    const tooDark = m.brightnessMean < 0.15;
+    out.push({
+      id: "fix-exposure",
+      category: "trustSignals",
+      priority: "medium",
+      title: tooDark ? "Brighten the overall exposure" : "Tone down the overall exposure",
+      action: tooDark
+        ? "Raise the midtones so the subject is clearly lit. Aim for an average brightness in the 30-75% band where most polished ads sit."
+        : "Reduce the highlights and add a mid-tone or darker region for contrast. Aim for an average brightness in the 30-75% band.",
     });
   }
 
