@@ -90,6 +90,26 @@ npm run dev:web
 
 Default browser API base in dev is `http://127.0.0.1:8010` (see [apps/web/lib/api.ts](apps/web/lib/api.ts)). Override with `NEXT_PUBLIC_API_URL` when pointing at a remote API.
 
+### Tests
+
+The web/worker side ships a set of lightweight Node test scripts (no test
+runner dependency — they use `node:assert` and run `.mts` directly). From the
+repo root:
+
+```bash
+npm test            # worker + web-config + web-heuristics suites
+npm run test:worker         # Cloudflare Worker request/CORS behavior
+npm run test:web-config     # browser API base resolution
+npm run test:web-heuristics # client-side Sobel edge ratios + issue/rec taxonomy
+```
+
+The API is covered by `pytest`:
+
+```bash
+cd apps/api
+python -m pytest -q
+```
+
 ### Environment variables (API)
 
 See [apps/api/.env.example](apps/api/.env.example). Important behavior:
