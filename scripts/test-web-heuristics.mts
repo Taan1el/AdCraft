@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   buildIssues,
   buildRecommendations,
+  EXPOSURE_ADVICE_BAND,
+  EXPOSURE_ISSUE_BAND,
   sobelEdgeRatio,
 } from "../apps/web/lib/heuristics.ts";
 
@@ -205,3 +207,58 @@ for (const id of ["boost-contrast", "stronger-cta", "reduce-clutter", "add-paddi
 }
 
 console.log("Heuristic issue/recommendation taxonomy tests passed.");
+
+// ---------------------------------------------------------------------------
+// Exposure-band invariant.
+//
+// The brightness thresholds used to live as bare literals in both builders and
+// had drifted to 0.12/0.9 (issue) vs 0.15/0.88 (advice). They are now shared
+// constants, and the contract is that the advice band fully contains the issue
+// band on both ends: any frame flagged as an exposure *problem* must also get a
+// fix *recommendation* — never a red issue with no advice on how to fix it.
+assert.ok(
+  EXPOSURE_ADVICE_BAND.dark >= EXPOSURE_ISSUE_BAND.dark,
+  "advice dark cutoff must be at least the issue dark cutoff",
+);
+assert.ok(
+  EXPOSURE_ADVICE_BAND.light <= EXPOSURE_ISSUE_BAND.light,
+  "advice light cutoff must be at most the issue light cutoff",
+);
+
+// Drive it through the real builders across the full brightness range: wherever
+// the brightness-extreme issue fires, the fix-exposure recommendation must fire
+// too. This catches a future edit that widens the issue band past the advice
+// band even if the constants above are edited in lockstep with it.
+const exposureProbe = {
+  ...baseMetrics,
+  whitespaceRatio: 0.3,
+  visualDensity: 0.12,
+  contrastScore: 8,
+  ctaSaliencyScore: 0.9,
+  topRegionDensity: 0.3,
+  bottomRegionDensity: 0.1,
+};
+const exposureScores = {
+  visualHierarchy: 85,
+  ctaProminence: 80,
+  copyClarity: 82,
+  readability: 95,
+  layoutBalance: 80,
+  trustSignals: 78,
+};
+for (let step = 0; step <= 100; step++) {
+  const brightnessMean = step / 100;
+  const metrics = { ...exposureProbe, brightnessMean };
+  const hasIssue = buildIssues(metrics as never, exposureScores as never)
+    .some((issue) => issue.id === "brightness-extreme");
+  const hasRec = buildRecommendations(metrics as never, exposureScores as never)
+    .some((rec) => rec.id === "fix-exposure");
+  if (hasIssue) {
+    assert.ok(
+      hasRec,
+      `brightnessMean ${brightnessMean.toFixed(2)} flags an exposure issue but offers no fix recommendation`,
+    );
+  }
+}
+
+console.log("Heuristic exposure-band invariant tests passed.");

@@ -33,6 +33,19 @@ type Metrics = {
 
 const MAX_DIM = 800; // downsample large uploads — keeps Sobel fast
 
+// Average brightness is normalized 0-1 (see measureBrightness). Polished ads
+// sit in a ~0.3-0.75 band; the extremes read as under- or over-exposed on a
+// phone. Two nested bands drive the copy: the ISSUE band flags a genuine
+// exposure problem, and the slightly wider ADVICE band also nudges frames that
+// are merely close to the edge. The advice band must fully contain the issue
+// band on both ends, so any frame flagged as a problem always also receives a
+// fix hint — pinned by test-web-heuristics. Keeping the thresholds here (rather
+// than duplicated as literals in buildIssues and buildRecommendations, where
+// they had already drifted to 0.12/0.9 vs 0.15/0.88) keeps that relationship
+// visible and hard to break by accident.
+export const EXPOSURE_ISSUE_BAND = { dark: 0.12, light: 0.9 } as const;
+export const EXPOSURE_ADVICE_BAND = { dark: 0.15, light: 0.88 } as const;
+
 async function loadImage(file: File): Promise<HTMLImageElement> {
   const url = URL.createObjectURL(file);
   try {
@@ -350,10 +363,11 @@ export function buildIssues(m: Metrics, scores: CategoryScores): Issue[] {
     });
   }
 
-  // brightnessMean is normalized 0-1 (see measureBrightness). Polished ads sit
-  // in a ~0.3-0.75 band; the extremes read as under- or over-exposed on a phone.
-  if (m.brightnessMean < 0.12 || m.brightnessMean > 0.9) {
-    const tooDark = m.brightnessMean < 0.12;
+  // Flag a genuine exposure problem: brightnessMean outside the issue band
+  // (see EXPOSURE_ISSUE_BAND for why these bounds and how they relate to the
+  // wider advice band that buildRecommendations uses).
+  if (m.brightnessMean < EXPOSURE_ISSUE_BAND.dark || m.brightnessMean > EXPOSURE_ISSUE_BAND.light) {
+    const tooDark = m.brightnessMean < EXPOSURE_ISSUE_BAND.dark;
     out.push({
       id: "brightness-extreme",
       category: "trustSignals",
@@ -414,8 +428,8 @@ export function buildRecommendations(m: Metrics, scores: CategoryScores): Recomm
     });
   }
 
-  if (m.brightnessMean < 0.15 || m.brightnessMean > 0.88) {
-    const tooDark = m.brightnessMean < 0.15;
+  if (m.brightnessMean < EXPOSURE_ADVICE_BAND.dark || m.brightnessMean > EXPOSURE_ADVICE_BAND.light) {
+    const tooDark = m.brightnessMean < EXPOSURE_ADVICE_BAND.dark;
     out.push({
       id: "fix-exposure",
       category: "trustSignals",
