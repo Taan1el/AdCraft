@@ -455,7 +455,7 @@ export function buildRecommendations(m: Metrics, scores: CategoryScores): Recomm
   return out;
 }
 
-function buildSummary(scores: CategoryScores, overall: number): string {
+export function buildSummary(scores: CategoryScores, overall: number): string {
   const weakest = (Object.entries(scores) as [keyof CategoryScores, number][])
     .sort((a, b) => a[1] - b[1])[0];
   const niceName: Record<keyof CategoryScores, string> = {

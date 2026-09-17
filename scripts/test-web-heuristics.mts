@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   buildIssues,
   buildRecommendations,
+  buildSummary,
   EXPOSURE_ADVICE_BAND,
   EXPOSURE_ISSUE_BAND,
   sobelEdgeRatio,
@@ -262,3 +263,79 @@ for (let step = 0; step <= 100; step++) {
 }
 
 console.log("Heuristic exposure-band invariant tests passed.");
+
+// ---------------------------------------------------------------------------
+// Summary-sentence invariants.
+//
+// buildSummary writes the one-line verdict the results screen leads with. It
+// names the weakest category and picks a tier word from the overall score.
+// Two ways it can quietly go wrong, neither caught before now: it could name a
+// category that is not actually the lowest, or — because it maps the raw
+// CategoryScores key to a human label — a missing/renamed key would leak a
+// camelCase token like "trustSignals" straight into user-facing copy. Pin both,
+// plus the tier thresholds at their boundaries so an off-by-one there can't
+// silently reword every result.
+const CATEGORY_KEYS = [
+  "visualHierarchy",
+  "ctaProminence",
+  "copyClarity",
+  "readability",
+  "layoutBalance",
+  "trustSignals",
+] as const;
+
+// Human labels buildSummary is expected to use — the moment a key leaks
+// unmapped, its camelCase form would appear verbatim instead of one of these.
+const CATEGORY_LABELS: Record<(typeof CATEGORY_KEYS)[number], string> = {
+  visualHierarchy: "visual hierarchy",
+  ctaProminence: "CTA prominence",
+  copyClarity: "copy clarity",
+  readability: "readability",
+  layoutBalance: "layout balance",
+  trustSignals: "trust signals",
+};
+
+// The summary must name whichever category actually holds the minimum score.
+// Drive one distinct low per category so a hard-coded or mis-sorted pick fails.
+for (const weakKey of CATEGORY_KEYS) {
+  const scores = Object.fromEntries(
+    CATEGORY_KEYS.map((key) => [key, key === weakKey ? 20 : 80]),
+  ) as Record<(typeof CATEGORY_KEYS)[number], number>;
+  const summary = buildSummary(scores as never, 70);
+  assert.ok(
+    summary.includes(CATEGORY_LABELS[weakKey]),
+    `summary should name the weakest category "${weakKey}" (${CATEGORY_LABELS[weakKey]})`,
+  );
+  // No raw camelCase key may reach the copy — only its mapped label. Skip
+  // "readability", whose label is legitimately identical to its key; the guard
+  // still catches every compound key (trustSignals, visualHierarchy, …) leaking.
+  for (const key of CATEGORY_KEYS) {
+    if (CATEGORY_LABELS[key] === key) continue;
+    assert.ok(
+      !summary.includes(key),
+      `summary leaked the raw key "${key}" instead of a human label`,
+    );
+  }
+}
+
+// Tier word is chosen by overall: >=80 strong, >=65 decent, >=50 mixed, else
+// weak. Check each boundary and the value just below it.
+const flatScores = Object.fromEntries(
+  CATEGORY_KEYS.map((key) => [key, 50]),
+) as Record<(typeof CATEGORY_KEYS)[number], number>;
+for (const [overall, tier] of [
+  [80, "strong"],
+  [79, "decent"],
+  [65, "decent"],
+  [64, "mixed"],
+  [50, "mixed"],
+  [49, "weak"],
+] as const) {
+  const summary = buildSummary(flatScores as never, overall);
+  assert.ok(
+    summary.includes(`${tier} overall (${overall}/100)`),
+    `overall ${overall} should read as "${tier}" but got: ${summary}`,
+  );
+}
+
+console.log("Heuristic summary-sentence invariant tests passed.");
