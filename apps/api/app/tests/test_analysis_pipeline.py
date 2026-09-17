@@ -206,6 +206,47 @@ def test_clean_image_does_not_flag_visual_clutter(monkeypatch: MonkeyPatch) -> N
     assert all(r["id"] != "rec_reduce_clutter" for r in result["recommendations"])
 
 
+def test_every_deterministic_issue_has_a_paired_recommendation(monkeypatch: MonkeyPatch) -> None:
+    """No red issue without a fix.
+
+    Each deterministic branch appends an issue *and* a recommendation of the
+    same category in lockstep (low contrast ships with 'increase contrast',
+    clutter with 'reduce clutter', and so on). Nothing pinned that pairing, so a
+    future branch that adds an issue but forgets its recommendation — leaving a
+    problem the UI can't tell the user how to fix — would still pass every other
+    test. Assert the per-image parity, and use two frames whose branches don't
+    overlap so that between them all three deterministic pairs are exercised:
+    the white frame trips the contrast + CTA branches, the checkerboard trips
+    the density branch.
+    """
+    monkeypatch.setattr(analysis_pipeline.settings, "mock_analysis", True)
+    images = {
+        "white": Image.new("RGB", (600, 315), "white"),
+        "checkerboard": _checkerboard(),
+    }
+
+    seen_categories: set[str] = set()
+    for label, image in images.items():
+        result = analysis_pipeline.run_analysis(
+            image=image,
+            ad_type="display_ad",
+            campaign_goal=None,
+            audience=None,
+            brand_name=None,
+        )
+        issue_categories = sorted(i["category"] for i in result["issues"])
+        rec_categories = sorted(r["category"] for r in result["recommendations"])
+        assert issue_categories == rec_categories, (
+            f"{label}: issues {issue_categories} not matched by recs {rec_categories}"
+        )
+        seen_categories.update(issue_categories)
+
+    # The two frames together should have fired every deterministic branch, so
+    # the parity check above actually covers all three — not just the two the
+    # white frame happens to reach.
+    assert seen_categories == {"readability", "ctaProminence", "visualHierarchy"}
+
+
 def test_pipeline_falls_back_to_base_response_on_invalid_model_output(monkeypatch: MonkeyPatch) -> None:
     from jsonschema import validate
 
