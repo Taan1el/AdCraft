@@ -12,10 +12,11 @@
     "dev": "npm run dev:api & npm run dev:web",
     "dev:worker": "npm --workspace apps/worker run dev",
     "deploy:worker": "npm --workspace apps/worker run deploy",
-    "test": "npm run test:worker && npm run test:web-config && npm run test:web-heuristics",
+    "test": "npm run test:worker && npm run test:web-config && npm run test:web-heuristics && npm run test:web-aggregates",
     "test:worker": "node scripts/test-worker.mts",
     "test:web-config": "node scripts/test-web-api-config.mts",
     "test:web-heuristics": "node scripts/test-web-heuristics.mts",
+    "test:web-aggregates": "node scripts/test-web-aggregates.mts",
     "lint:web": "npm --workspace apps/web run lint",
     "typecheck:web": "npm --workspace apps/web run typecheck"
   }

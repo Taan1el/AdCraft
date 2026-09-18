@@ -3,20 +3,12 @@
 // keeps the anonymous heuristic flow working when the user is logged out.
 import type { AnalysisResponse, AdType } from "@adcraft/shared-types";
 import { getSupabase } from "@/lib/supabase";
+import type { AnalysisRow } from "@/lib/aggregates";
 
-export type AnalysisRow = {
-  id: string;
-  created_at: string;
-  file_name: string | null;
-  image_path: string | null;
-  ad_type: AdType;
-  overall: number;
-  scores: AnalysisResponse["categoryScores"];
-  metrics: AnalysisResponse["metrics"];
-  summary: string | null;
-  source: "local" | "remote" | "gemini";
-  signedImageUrl?: string;
-};
+// Aggregate helpers live in a Supabase-free module so they can be unit-tested
+// directly; re-export them here so "@/lib/history" stays the single import site.
+export { computeAggregates } from "@/lib/aggregates";
+export type { AnalysisRow, Aggregates } from "@/lib/aggregates";
 
 const BUCKET = "ads";
 const HISTORY_LIMIT = 10;
@@ -93,47 +85,3 @@ export async function deleteAnalysis(row: AnalysisRow): Promise<void> {
   await sb.from("analyses").delete().eq("id", row.id);
 }
 
-export type Aggregates = {
-  count: number;
-  averageOverall: number;
-  best: AnalysisRow | null;
-  worst: AnalysisRow | null;
-  averagesByCategory: Record<keyof AnalysisResponse["categoryScores"], number>;
-};
-
-export function computeAggregates(rows: AnalysisRow[]): Aggregates {
-  const cats: (keyof AnalysisResponse["categoryScores"])[] = [
-    "visualHierarchy", "ctaProminence", "copyClarity", "readability", "layoutBalance", "trustSignals",
-  ];
-  const empty: Aggregates = {
-    count: 0, averageOverall: 0, best: null, worst: null,
-    averagesByCategory: {
-      visualHierarchy: 0, ctaProminence: 0, copyClarity: 0,
-      readability: 0, layoutBalance: 0, trustSignals: 0,
-    },
-  };
-  if (rows.length === 0) return empty;
-
-  let best = rows[0];
-  let worst = rows[0];
-  let sumOverall = 0;
-  const sumByCat: Record<string, number> = {};
-  for (const c of cats) sumByCat[c] = 0;
-
-  for (const r of rows) {
-    sumOverall += r.overall;
-    if (r.overall > best.overall) best = r;
-    if (r.overall < worst.overall) worst = r;
-    for (const c of cats) sumByCat[c] += r.scores[c] ?? 0;
-  }
-  const avgByCat = {} as Aggregates["averagesByCategory"];
-  for (const c of cats) avgByCat[c] = Math.round(sumByCat[c] / rows.length);
-
-  return {
-    count: rows.length,
-    averageOverall: Math.round(sumOverall / rows.length),
-    best,
-    worst,
-    averagesByCategory: avgByCat,
-  };
-}
