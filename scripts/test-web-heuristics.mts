@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
 
 import {
+  aspectScore,
   buildIssues,
   buildRecommendations,
   buildSummary,
+  contrastRatio,
   EXPOSURE_ADVICE_BAND,
   EXPOSURE_ISSUE_BAND,
+  luminance,
+  scoreFromTarget,
   sobelEdgeRatio,
 } from "../apps/web/lib/heuristics.ts";
 
@@ -339,3 +343,74 @@ for (const [overall, tier] of [
 }
 
 console.log("Heuristic summary-sentence invariant tests passed.");
+
+// ---------------------------------------------------------------------------
+// Score-mapping curve: scoreFromTarget + aspectScore.
+//
+// These pure helpers turn a raw measurement into a 0..100 category score and
+// back the per-slot aspect-ratio grade. They feed every deriveScores() output
+// but had no direct coverage, so a retuned band or a sign flip in the falloff
+// math could regress silently behind the higher-level builder tests.
+{
+  // Anything inside [idealMin, idealMax] is a perfect 100.
+  assert.equal(scoreFromTarget(0.5, 0.4, 0.6, 0.2), 100);
+  assert.equal(scoreFromTarget(0.4, 0.4, 0.6, 0.2), 100, "lower bound is inclusive");
+  assert.equal(scoreFromTarget(0.6, 0.4, 0.6, 0.2), 100, "upper bound is inclusive");
+
+  // Outside the band the score falls off linearly by distance/falloff, and a
+  // full falloff away scores 0 (100 - 100%).
+  assert.equal(scoreFromTarget(0.2, 0.4, 0.6, 0.2), 0, "one falloff below floors at 0");
+  assert.equal(scoreFromTarget(0.8, 0.4, 0.6, 0.2), 0, "one falloff above floors at 0");
+  assert.equal(scoreFromTarget(0.5, 0.4, 0.6, 0.2), 100);
+  // Half a falloff away → 50 (float math, so compare within a small epsilon).
+  assert.ok(Math.abs(scoreFromTarget(0.3, 0.4, 0.6, 0.2) - 50) < 1e-9);
+  assert.ok(Math.abs(scoreFromTarget(0.7, 0.4, 0.6, 0.2) - 50) < 1e-9);
+  // Beyond a full falloff clamps at 0 rather than going negative.
+  assert.equal(scoreFromTarget(10, 0.4, 0.6, 0.2), 0);
+
+  // aspectScore grades the measured ratio against the ideal band for the slot.
+  // A social ad is square-ish (0.8..1.25): 1:1 is perfect, a 1.91:1 banner is not.
+  assert.equal(aspectScore("social_ad", 1), 100);
+  assert.ok(aspectScore("social_ad", 1.91) < 100, "a wide ratio is off-target for a square slot");
+  // A display ad wants ~1.5..1.95: the same 1.91:1 banner is on-target there.
+  assert.equal(aspectScore("display_ad", 1.9), 100);
+  // Every slot stays inside [0, 100] even for an absurd ratio.
+  for (const adType of ["display_ad", "landing_hero", "email_hero", "social_ad"] as const) {
+    const score = aspectScore(adType, 42);
+    assert.ok(score >= 0 && score <= 100, `${adType} aspect score must stay in [0,100]`);
+  }
+}
+
+console.log("Heuristic score-mapping curve tests passed.");
+
+// ---------------------------------------------------------------------------
+// Color math: luminance + contrastRatio (WCAG).
+//
+// contrastRatio drives the contrast metric and the low-contrast issue. The two
+// functions are pure RGB math with no canvas dependency, so pin the known WCAG
+// anchor points: black vs white is exactly 21:1 and is symmetric regardless of
+// argument order, and an identical pair is exactly 1:1.
+{
+  const black = { r: 0, g: 0, b: 0 };
+  const white = { r: 255, g: 255, b: 255 };
+
+  assert.equal(luminance(black), 0, "black has zero relative luminance");
+  assert.equal(luminance(white), 1, "white has unit relative luminance");
+
+  // (1 + 0.05) / (0 + 0.05) = 21.
+  assert.equal(Math.round(contrastRatio(black, white)), 21);
+  assert.equal(
+    contrastRatio(black, white),
+    contrastRatio(white, black),
+    "contrast is order-independent",
+  );
+  assert.equal(contrastRatio(white, white), 1, "identical colors contrast 1:1");
+  assert.equal(contrastRatio(black, black), 1, "identical colors contrast 1:1");
+
+  // A mid grey sits strictly between the extremes.
+  const grey = { r: 128, g: 128, b: 128 };
+  const gl = luminance(grey);
+  assert.ok(gl > 0 && gl < 1, "mid grey luminance lies between black and white");
+}
+
+console.log("Heuristic color-math tests passed.");

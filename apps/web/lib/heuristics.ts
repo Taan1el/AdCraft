@@ -14,7 +14,7 @@ import type {
   Recommendation,
 } from "@adcraft/shared-types";
 
-type RGB = { r: number; g: number; b: number };
+export type RGB = { r: number; g: number; b: number };
 
 type Metrics = {
   whitespaceRatio: number;
@@ -77,7 +77,7 @@ function drawToCanvas(img: HTMLImageElement): { data: ImageData; width: number; 
 }
 
 // WCAG relative luminance
-function luminance({ r, g, b }: RGB): number {
+export function luminance({ r, g, b }: RGB): number {
   const f = (c: number) => {
     const s = c / 255;
     return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
@@ -85,7 +85,7 @@ function luminance({ r, g, b }: RGB): number {
   return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
 }
 
-function contrastRatio(a: RGB, b: RGB): number {
+export function contrastRatio(a: RGB, b: RGB): number {
   const la = luminance(a);
   const lb = luminance(b);
   const [hi, lo] = la > lb ? [la, lb] : [lb, la];
@@ -204,13 +204,13 @@ function clamp(n: number, lo = 0, hi = 100): number {
   return Math.max(lo, Math.min(hi, n));
 }
 
-function scoreFromTarget(value: number, idealMin: number, idealMax: number, falloff: number): number {
+export function scoreFromTarget(value: number, idealMin: number, idealMax: number, falloff: number): number {
   if (value >= idealMin && value <= idealMax) return 100;
   const dist = value < idealMin ? idealMin - value : value - idealMax;
   return clamp(100 - (dist / falloff) * 100);
 }
 
-function aspectScore(adType: AdType, ratio: number): number {
+export function aspectScore(adType: AdType, ratio: number): number {
   // ideal ratio per ad slot. Falloff is loose — we don't penalize hard.
   const targets: Record<AdType, [number, number]> = {
     display_ad: [1.5, 1.95],   // ~1.91:1 (Meta feed) or wider
