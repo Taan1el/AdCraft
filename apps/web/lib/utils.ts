@@ -10,3 +10,16 @@ export function formatPct01(x: number): string {
   return `${Math.round(v * 100)}%`;
 }
 
+// Derive a lowercased file extension for use as a storage object-key suffix.
+// A `split(".").pop()` on an extensionless name like "logo" returns the whole
+// name ("logo"), which would then masquerade as the extension in the object
+// key; a trailing dot ("logo.") returns "", and a junk suffix ("a.n@me") is not
+// a real extension. Require a dot followed by 1-5 alphanumerics, else fall back
+// to `fallback` so the key always ends in a plausible extension.
+export function imageExtension(fileName: string, fallback = "png"): string {
+  if (typeof fileName !== "string") return fallback;
+  const dot = fileName.lastIndexOf(".");
+  const ext = dot >= 0 ? fileName.slice(dot + 1).toLowerCase() : "";
+  return /^[a-z0-9]{1,5}$/.test(ext) ? ext : fallback;
+}
+

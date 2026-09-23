@@ -3,6 +3,7 @@
 // keeps the anonymous heuristic flow working when the user is logged out.
 import type { AnalysisResponse, AdType } from "@adcraft/shared-types";
 import { getSupabase } from "@/lib/supabase";
+import { imageExtension } from "@/lib/utils";
 import type { AnalysisRow } from "@/lib/aggregates";
 
 // Aggregate helpers live in a Supabase-free module so they can be unit-tested
@@ -26,7 +27,7 @@ export async function saveAnalysis(opts: {
   if (!userId) return { saved: false };
 
   // Object key is namespaced by user id — RLS policy keys off the first folder.
-  const ext = (opts.file.name.split(".").pop() || "png").toLowerCase();
+  const ext = imageExtension(opts.file.name);
   const key = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
   const up = await sb.storage.from(BUCKET).upload(key, opts.file, {

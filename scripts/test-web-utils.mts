@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { cn, formatPct01 } from "../apps/web/lib/utils.ts";
+import { cn, formatPct01, imageExtension } from "../apps/web/lib/utils.ts";
 
 // cn joins truthy class names with a single space and drops falsy entries, so
 // callers can write cn("base", cond && "active") without leaking "false" or
@@ -36,6 +36,29 @@ import { cn, formatPct01 } from "../apps/web/lib/utils.ts";
   assert.equal(formatPct01(NaN), "0%");
   assert.equal(formatPct01(Infinity), "0%");
   assert.equal(formatPct01(-Infinity), "0%");
+}
+
+// imageExtension derives a lowercased object-key suffix. A real extension is
+// preserved and lowercased; an extensionless name must NOT leak the whole name
+// as the "extension" (the split(".").pop() bug this replaced), and junk/oversized
+// suffixes fall back to png.
+{
+  assert.equal(imageExtension("shot.png"), "png");
+  assert.equal(imageExtension("PHOTO.JPG"), "jpg");
+  assert.equal(imageExtension("a.b.jpeg"), "jpeg");
+  assert.equal(imageExtension("banner.webp"), "webp");
+  // The core fix: no dot means no extension, so fall back rather than return
+  // "logo" as the suffix.
+  assert.equal(imageExtension("logo"), "png");
+  assert.equal(imageExtension("trailingdot."), "png");
+  assert.equal(imageExtension(""), "png");
+  // A non-alphanumeric or oversized suffix is not a plausible extension.
+  assert.equal(imageExtension("weird.n@me"), "png");
+  assert.equal(imageExtension("archive.verylong"), "png");
+  // Caller can override the fallback.
+  assert.equal(imageExtension("logo", "jpg"), "jpg");
+  // Defensive: a non-string (untyped/runtime input) falls back cleanly.
+  assert.equal(imageExtension(undefined as unknown as string), "png");
 }
 
 console.log("web utils: ok");
