@@ -1,6 +1,7 @@
 import type { AdType, AnalysisResponse } from "@/lib/types";
 import { analyzeLocally } from "@/lib/heuristics";
 import { normalizeApiBase } from "@/lib/api-config";
+import { RemoteAnalyzeError, shouldFallBackToLocal } from "@/lib/analyze-fallback";
 
 export type AnalyzeInput = {
   file: File;
@@ -20,16 +21,6 @@ export type AnalyzeOutcome = {
   // explanation when fellBack is true — shown discreetly in the UI
   fallbackReason?: string;
 };
-
-class RemoteAnalyzeError extends Error {
-  constructor(
-    readonly status: number,
-    message: string,
-  ) {
-    super(message);
-    this.name = "RemoteAnalyzeError";
-  }
-}
 
 function apiBase(): string | null {
   // Explicitly blank values disable the backend and force local heuristic mode.
@@ -78,14 +69,9 @@ export async function analyzeCreative(input: AnalyzeInput): Promise<AnalyzeOutco
       // Invalid uploads and other client errors need to reach the user. Running
       // the same rejected input through local heuristics can hide backend size
       // or image-validation failures and produce a misleading "successful"
-      // analysis. Availability errors and rate limits may still fall back.
-      if (
-        err instanceof RemoteAnalyzeError &&
-        err.status >= 400 &&
-        err.status < 500 &&
-        err.status !== 408 &&
-        err.status !== 429
-      ) {
+      // analysis. Availability errors and rate limits may still fall back — see
+      // shouldFallBackToLocal for the exact policy.
+      if (!shouldFallBackToLocal(err)) {
         throw err;
       }
       const reason = err instanceof Error ? err.message : "Unknown error";
