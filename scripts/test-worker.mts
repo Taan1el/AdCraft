@@ -78,4 +78,66 @@ assert.equal(corsResponse.status, 200);
 assert.equal(corsResponse.headers.get("access-control-allow-origin"), "https://client.test");
 assert.equal(corsResponse.headers.get("vary"), "origin");
 
+// An OPTIONS preflight short-circuits to 204 (no body) but must still carry the
+// full CORS handshake: the echoed allow-origin for an allowed caller plus the
+// method/header allowances a browser checks before sending the real POST.
+const preflight = await worker.fetch(
+  new Request("https://worker.test/analyze", {
+    method: "OPTIONS",
+    headers: { origin: "https://client.test" },
+  }),
+  { ALLOWED_ORIGINS: "https://client.test" },
+);
+assert.equal(preflight.status, 204);
+assert.equal(preflight.headers.get("access-control-allow-origin"), "https://client.test");
+assert.equal(preflight.headers.get("access-control-allow-methods"), "GET,POST,OPTIONS");
+assert.equal(preflight.headers.get("access-control-allow-headers"), "content-type");
+
+// An origin that is NOT in ALLOWED_ORIGINS must never receive an
+// access-control-allow-origin header (the browser then blocks the read), but
+// the request itself still succeeds and the static method allowance is present.
+const foreignOrigin = await worker.fetch(
+  new Request("https://worker.test/health", {
+    headers: { origin: "https://evil.test" },
+  }),
+  { ALLOWED_ORIGINS: "https://client.test" },
+);
+assert.equal(foreignOrigin.status, 200);
+assert.equal(foreignOrigin.headers.get("access-control-allow-origin"), null);
+assert.equal(foreignOrigin.headers.get("access-control-allow-methods"), "GET,POST,OPTIONS");
+
+// A "*" entry allows any caller: the worker echoes the request's own origin
+// (not a literal "*") so the response stays compatible with credentialed reads.
+const wildcard = await worker.fetch(
+  new Request("https://worker.test/health", {
+    headers: { origin: "https://anywhere.test" },
+  }),
+  { ALLOWED_ORIGINS: "*" },
+);
+assert.equal(wildcard.status, 200);
+assert.equal(wildcard.headers.get("access-control-allow-origin"), "https://anywhere.test");
+assert.equal(wildcard.headers.get("vary"), "origin");
+
+// An unknown route falls through to a JSON 404 (still wrapped in CORS), not an
+// unhandled exception or an empty body.
+const notFound = await worker.fetch(new Request("https://worker.test/nope"), {});
+assert.equal(notFound.status, 404);
+assert.equal((await notFound.json() as { error?: string }).error, "Not found");
+
+// /analyze rejects a non-multipart body up front, before touching formData(),
+// so a mislabeled JSON post gets a clear 400 rather than a parse failure.
+const nonMultipart = await worker.fetch(
+  new Request("https://worker.test/analyze", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "{}",
+  }),
+  {},
+);
+assert.equal(nonMultipart.status, 400);
+assert.equal(
+  (await nonMultipart.json() as { error?: string }).error,
+  "Expected multipart/form-data",
+);
+
 console.log("Worker request and CORS tests passed.");
