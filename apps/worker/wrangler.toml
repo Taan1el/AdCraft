@@ -3,7 +3,10 @@ main = "src/index.ts"
 compatibility_date = "2026-04-16"
 
 [vars]
-# Comma-separated list of allowed Origins for CORS.
+# Comma-separated list of allowed Origins for CORS. An unlisted origin is
+# served the response but no access-control-allow-origin header, so the
+# browser blocks the read. Use a single "*" to echo any caller's origin
+# (handy for local experiments; prefer an explicit list in production).
 # Default keeps GitHub Pages working out of the box.
 ALLOWED_ORIGINS = "https://taan1el.github.io,http://127.0.0.1:3002,http://localhost:3002"
 
