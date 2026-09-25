@@ -112,9 +112,15 @@ function withCors(req: Request, env: Env, res: Response): Response {
   const allowed = allowedOrigins(env);
   const h = new Headers(res.headers);
 
+  // Every response from this wrapper picks its access-control-allow-origin from
+  // the request's Origin, so the response body/headers vary by origin. Emit
+  // Vary: Origin unconditionally — including on denied and origin-less requests
+  // — so a shared HTTP cache keyed on URL alone can't serve one origin's
+  // (allowed, ACAO-bearing) response to another origin, or a denied response
+  // back to an allowed caller.
+  h.set("vary", "origin");
   if (origin && (allowed.includes(origin) || allowed.includes("*"))) {
     h.set("access-control-allow-origin", origin);
-    h.set("vary", "origin");
   }
   h.set("access-control-allow-methods", "GET,POST,OPTIONS");
   h.set("access-control-allow-headers", "content-type");

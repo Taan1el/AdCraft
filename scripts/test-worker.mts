@@ -105,6 +105,20 @@ const foreignOrigin = await worker.fetch(
 assert.equal(foreignOrigin.status, 200);
 assert.equal(foreignOrigin.headers.get("access-control-allow-origin"), null);
 assert.equal(foreignOrigin.headers.get("access-control-allow-methods"), "GET,POST,OPTIONS");
+// The ACAO decision keys off the request Origin, so even a denied response must
+// carry Vary: origin — otherwise a URL-keyed shared cache could hand this
+// no-ACAO body to an allowed caller (or the reverse).
+assert.equal(foreignOrigin.headers.get("vary"), "origin");
+
+// A request with no Origin header still varies by origin (the header's absence
+// is what selects the no-ACAO branch), so Vary: origin is emitted there too.
+const noOrigin = await worker.fetch(
+  new Request("https://worker.test/health"),
+  { ALLOWED_ORIGINS: "https://client.test" },
+);
+assert.equal(noOrigin.status, 200);
+assert.equal(noOrigin.headers.get("access-control-allow-origin"), null);
+assert.equal(noOrigin.headers.get("vary"), "origin");
 
 // A "*" entry allows any caller: the worker echoes the request's own origin
 // (not a literal "*") so the response stays compatible with credentialed reads.
