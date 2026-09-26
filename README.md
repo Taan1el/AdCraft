@@ -93,14 +93,20 @@ Default browser API base in dev is `http://127.0.0.1:8010` (see [apps/web/lib/ap
 ### Tests
 
 The web/worker side ships a set of lightweight Node test scripts (no test
-runner dependency — they use `node:assert` and run `.mts` directly). From the
-repo root:
+runner dependency — they use `node:assert`). They are `.mts` files run directly
+with `node`, which relies on Node's built-in TypeScript type stripping, so the
+test scripts need **Node 22.18+ or 24** (older Node exits with
+`ERR_UNKNOWN_FILE_EXTENSION`). From the repo root:
 
 ```bash
-npm test            # worker + web-config + web-heuristics suites
-npm run test:worker         # Cloudflare Worker request/CORS behavior
-npm run test:web-config     # browser API base resolution
-npm run test:web-heuristics # client-side Sobel edge ratios + issue/rec taxonomy
+npm test                     # runs all seven suites below in sequence
+npm run test:worker          # Cloudflare Worker request/CORS behavior
+npm run test:web-config      # browser API base resolution
+npm run test:web-api         # remote-analyze fallback policy
+npm run test:web-heuristics  # client-side Sobel edge ratios + issue/rec taxonomy
+npm run test:web-aggregates  # aggregate reducer basics + non-finite resilience
+npm run test:web-utils       # shared web utility helpers
+npm run test:web-categories  # score → category mapping
 ```
 
 The API is covered by `pytest`:
