@@ -154,4 +154,57 @@ assert.equal(
   "Expected multipart/form-data",
 );
 
+// The success path returns a rich critique object, but the checks above only
+// assert its status. Pin the response invariants so a drift in the scoring or
+// issue/recommendation builders (an out-of-range score, a NaN metric, a dropped
+// default recommendation) can't ship a 200 with a malformed body.
+const okForm = new FormData();
+okForm.set(
+  "file",
+  new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], "creative.png", {
+    type: "image/png",
+  }),
+);
+okForm.set("adType", "display_ad");
+const okRes = await analyze(okForm);
+assert.equal(okRes.status, 200);
+
+type AnalyzeBody = {
+  analysisId: string;
+  overallScore: number;
+  categoryScores: Record<string, number>;
+  metrics: Record<string, number>;
+  issues: unknown[];
+  recommendations: unknown[];
+  annotations: unknown[];
+};
+const body = (await okRes.json()) as AnalyzeBody;
+
+// analysisId carries its "analysis_" prefix so clients can tell it apart from
+// issue/rec/annotation ids, which share the same uuid tail.
+assert.ok(body.analysisId.startsWith("analysis_"), "analysisId should be prefixed");
+
+const isPercent = (n: unknown): boolean =>
+  typeof n === "number" && Number.isInteger(n) && n >= 0 && n <= 100;
+assert.ok(isPercent(body.overallScore), "overallScore must be an integer 0..100");
+for (const [key, value] of Object.entries(body.categoryScores)) {
+  assert.ok(isPercent(value), `categoryScore ${key}=${value} must be an integer 0..100`);
+}
+
+// Metrics are clamped ratios: finite and within [0, 1], never NaN.
+for (const [key, value] of Object.entries(body.metrics)) {
+  assert.ok(
+    typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1,
+    `metric ${key}=${value} must be a finite ratio in [0, 1]`,
+  );
+}
+
+assert.ok(Array.isArray(body.issues), "issues must be an array");
+assert.ok(Array.isArray(body.annotations), "annotations must be an array");
+// The builder guarantees at least one recommendation even when no issue fires.
+assert.ok(
+  Array.isArray(body.recommendations) && body.recommendations.length >= 1,
+  "recommendations must always include at least one entry",
+);
+
 console.log("Worker request and CORS tests passed.");
