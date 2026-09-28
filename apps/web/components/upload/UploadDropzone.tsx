@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import { cn, shouldActivateUploadZone } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 
 export function UploadDropzone({
@@ -35,8 +35,10 @@ export function UploadDropzone({
         aria-disabled={disabled}
         onClick={() => !disabled && pick()}
         onKeyDown={(e) => {
-          if (disabled) return;
-          if (e.key === "Enter" || e.key === " ") pick();
+          if (shouldActivateUploadZone(e.key, e.target === e.currentTarget, !!disabled)) {
+            e.preventDefault();
+            pick();
+          }
         }}
         onDragOver={(e) => {
           e.preventDefault();
