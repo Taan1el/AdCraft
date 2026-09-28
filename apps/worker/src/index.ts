@@ -107,6 +107,22 @@ function allowedOrigins(env: Env): string[] {
   )];
 }
 
+// Methods each known route serves. Used both to answer wrong-method requests
+// with a correct 405 + Allow header (rather than a misleading 404) and to keep
+// that list in one place. OPTIONS is always handled by the preflight branch.
+const ROUTE_METHODS: Record<string, string[]> = {
+  "/health": ["GET", "HEAD", "OPTIONS"],
+  "/analyze": ["POST", "OPTIONS"],
+};
+
+function methodNotAllowed(req: Request, env: Env, methods: string[]): Response {
+  const res = json({ error: "Method not allowed", allowed: methods }, { status: 405 });
+  // RFC 9110 §15.5.6: a 405 MUST carry an Allow header listing the supported
+  // methods. withCors copies existing headers, so this survives the wrapper.
+  res.headers.set("allow", methods.join(", "));
+  return withCors(req, env, res);
+}
+
 function withCors(req: Request, env: Env, res: Response): Response {
   const origin = req.headers.get("origin");
   const allowed = allowedOrigins(env);
@@ -307,11 +323,26 @@ export default {
       return withCors(req, env, new Response(null, { status: 204 }));
     }
 
-    if (url.pathname === "/health" && req.method === "GET") {
-      return withCors(req, env, json({ ok: true }));
+    if (url.pathname === "/health") {
+      if (req.method === "GET" || req.method === "HEAD") {
+        const res = json({ ok: true });
+        // A HEAD carries the same headers as the GET but no body, so uptime
+        // monitors that probe with HEAD get a 200 instead of a bogus 404.
+        return withCors(
+          req,
+          env,
+          req.method === "HEAD"
+            ? new Response(null, { status: 200, headers: res.headers })
+            : res,
+        );
+      }
+      return methodNotAllowed(req, env, ROUTE_METHODS["/health"]);
     }
 
-    if (url.pathname === "/analyze" && req.method === "POST") {
+    if (url.pathname === "/analyze") {
+      if (req.method !== "POST") {
+        return methodNotAllowed(req, env, ROUTE_METHODS["/analyze"]);
+      }
       const ct = req.headers.get("content-type") || "";
       if (!ct.toLowerCase().includes("multipart/form-data")) {
         return withCors(

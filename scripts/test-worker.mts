@@ -138,6 +138,39 @@ const notFound = await worker.fetch(new Request("https://worker.test/nope"), {})
 assert.equal(notFound.status, 404);
 assert.equal((await notFound.json() as { error?: string }).error, "Not found");
 
+// A known route with the wrong method is a 405 with an Allow header (RFC 9110),
+// not a misleading 404 that implies the endpoint doesn't exist.
+const wrongMethodAnalyze = await worker.fetch(
+  new Request("https://worker.test/analyze", { method: "GET" }),
+  {},
+);
+assert.equal(wrongMethodAnalyze.status, 405);
+assert.equal(wrongMethodAnalyze.headers.get("allow"), "POST, OPTIONS");
+assert.equal(
+  (await wrongMethodAnalyze.json() as { error?: string }).error,
+  "Method not allowed",
+);
+
+const wrongMethodHealth = await worker.fetch(
+  new Request("https://worker.test/health", { method: "POST" }),
+  {},
+);
+assert.equal(wrongMethodHealth.status, 405);
+assert.equal(wrongMethodHealth.headers.get("allow"), "GET, HEAD, OPTIONS");
+
+// A HEAD probe on /health (how many uptime monitors check) is a 200 with no
+// body, sharing the GET's headers, rather than a bogus 404.
+const headHealth = await worker.fetch(
+  new Request("https://worker.test/health", { method: "HEAD" }),
+  {},
+);
+assert.equal(headHealth.status, 200);
+assert.equal(await headHealth.text(), "");
+assert.ok(
+  (headHealth.headers.get("content-type") || "").includes("application/json"),
+  "HEAD /health should carry the GET's content-type",
+);
+
 // /analyze rejects a non-multipart body up front, before touching formData(),
 // so a mislabeled JSON post gets a clear 400 rather than a parse failure.
 const nonMultipart = await worker.fetch(
