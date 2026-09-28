@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 
-import { cn, formatContrastScore, formatPct01, imageExtension } from "../apps/web/lib/utils.ts";
+import {
+  cn,
+  formatContrastScore,
+  formatPct01,
+  imageExtension,
+  shouldActivateUploadZone,
+} from "../apps/web/lib/utils.ts";
 
 // cn joins truthy class names with a single space and drops falsy entries, so
 // callers can write cn("base", cond && "active") without leaking "false" or
@@ -11,6 +17,16 @@ import { cn, formatContrastScore, formatPct01, imageExtension } from "../apps/we
   assert.equal(cn(), "");
   // An all-falsy call collapses to the empty string, not " " or "false".
   assert.equal(cn(false, null, undefined), "");
+}
+
+// Upload-zone keyboard activation must not duplicate events from nested controls.
+{
+  assert.equal(shouldActivateUploadZone("Enter", true, false), true);
+  assert.equal(shouldActivateUploadZone(" ", true, false), true);
+  assert.equal(shouldActivateUploadZone("Escape", true, false), false);
+  assert.equal(shouldActivateUploadZone("Enter", false, false), false);
+  assert.equal(shouldActivateUploadZone(" ", false, false), false);
+  assert.equal(shouldActivateUploadZone("Enter", true, true), false);
 }
 
 // Remote contrast scores are normalized ratios; local scores are WCAG ratios.

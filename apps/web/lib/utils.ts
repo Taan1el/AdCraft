@@ -17,6 +17,14 @@ export function formatContrastScore(
   return source === "remote" ? formatPct01(score) : `${score.toFixed(1)}:1`;
 }
 
+export function shouldActivateUploadZone(
+  key: string,
+  isDirectTarget: boolean,
+  loading: boolean,
+): boolean {
+  return !loading && isDirectTarget && (key === "Enter" || key === " ");
+}
+
 // Derive a lowercased file extension for use as a storage object-key suffix.
 // A `split(".").pop()` on an extensionless name like "logo" returns the whole
 // name ("logo"), which would then masquerade as the extension in the object

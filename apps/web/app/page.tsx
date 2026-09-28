@@ -6,7 +6,7 @@ import type { AdType } from "@/lib/types";
 import { AuthMenu } from "@/components/AuthMenu";
 import { useAuth } from "@/lib/auth-context";
 import { saveAnalysis } from "@/lib/history";
-import { formatContrastScore, formatPct01 } from "@/lib/utils";
+import { formatContrastScore, formatPct01, shouldActivateUploadZone } from "@/lib/utils";
 
 // 6 truthful feature cards — each one maps to actual capability in the codebase.
 const FEATURES = [
@@ -333,8 +333,7 @@ function UploadZone({
 }) {
   // Keyboard handler for the zone so non-mouse users can open the picker.
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (loading) return;
-    if (e.key === "Enter" || e.key === " ") {
+    if (shouldActivateUploadZone(e.key, e.target === e.currentTarget, loading)) {
       e.preventDefault();
       onPick();
     }
