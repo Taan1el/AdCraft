@@ -4,8 +4,9 @@
 
 AdCraft AI is split into:
 
-- a Next.js frontend for the product experience
-- a FastAPI backend for analysis orchestration
+- a statically exported Next.js frontend for the product experience
+- a configurable remote `POST /analyze` endpoint: either the lightweight Cloudflare Worker or the Python Starlette API
+- browser-local pixel analysis used when no remote is configured, or when the configured endpoint has an availability failure
 
 The product is designed around one narrow flow:
 
@@ -30,8 +31,8 @@ The product is designed around one narrow flow:
 - image normalization
 - deterministic metric computation
 - optional LLM refinement
-- response validation through Pydantic
-- fallback handling
+- schema validation for model-produced JSON
+- explicit error and fallback handling
 
 ## Analysis pipeline
 
@@ -75,22 +76,33 @@ A deterministic scorer converts visual metrics into:
 - annotation boxes
 - summary
 
-This guarantees the product works even with no model key.
+The browser-local analyzer and Worker always use deterministic analysis. The
+Starlette API also builds this deterministic base, but when
+`MOCK_ANALYSIS=false` it requires at least one model key; otherwise the request
+returns 503 rather than silently treating mock output as AI output.
 
-### 5. Optional OpenAI refinement
+### 5. Optional Gemini or OpenAI refinement
 
-If `OPENAI_API_KEY` is present and `MOCK_ANALYSIS=false`, the backend sends:
+When `MOCK_ANALYSIS=false`, the Starlette API prefers Gemini when
+`GEMINI_API_KEY` is configured and otherwise uses OpenAI when
+`OPENAI_API_KEY` is configured. It sends:
 
 - the uploaded image
 - structured metrics
 - the current deterministic result
 - user context
 
-to the OpenAI Responses API and requests a typed refinement. The backend merges that result into the deterministic payload.
+to the selected provider and requests JSON matching the current analysis
+schema. The response is parsed and validated, then deterministic measurements
+and annotations are pinned back onto the refined payload.
 
 ### 6. Fallback
 
-If the model call fails or returns unusable output, the backend keeps the deterministic result.
+Invalid model JSON gets one repair attempt; provider or validation failure then
+keeps the deterministic Starlette result. Separately, the browser falls back to
+its local analyzer for remote availability failures, timeouts, and rate limits.
+Other remote 4xx responses remain visible because local analysis must not hide
+invalid uploads or request errors.
 
 ## Why this shape works
 
