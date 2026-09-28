@@ -10,6 +10,13 @@ export function formatPct01(x: number): string {
   return `${Math.round(v * 100)}%`;
 }
 
+export function formatContrastScore(
+  score: number,
+  source: "remote" | "local",
+): string {
+  return source === "remote" ? formatPct01(score) : `${score.toFixed(1)}:1`;
+}
+
 // Derive a lowercased file extension for use as a storage object-key suffix.
 // A `split(".").pop()` on an extensionless name like "logo" returns the whole
 // name ("logo"), which would then masquerade as the extension in the object

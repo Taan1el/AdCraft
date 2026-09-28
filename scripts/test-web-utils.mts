@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { cn, formatPct01, imageExtension } from "../apps/web/lib/utils.ts";
+import { cn, formatContrastScore, formatPct01, imageExtension } from "../apps/web/lib/utils.ts";
 
 // cn joins truthy class names with a single space and drops falsy entries, so
 // callers can write cn("base", cond && "active") without leaking "false" or
@@ -11,6 +11,14 @@ import { cn, formatPct01, imageExtension } from "../apps/web/lib/utils.ts";
   assert.equal(cn(), "");
   // An all-falsy call collapses to the empty string, not " " or "false".
   assert.equal(cn(false, null, undefined), "");
+}
+
+// Remote contrast scores are normalized ratios; local scores are WCAG ratios.
+{
+  assert.equal(formatContrastScore(0, "remote"), "0%");
+  assert.equal(formatContrastScore(0.5, "remote"), "50%");
+  assert.equal(formatContrastScore(1, "remote"), "100%");
+  assert.equal(formatContrastScore(4.56, "local"), "4.6:1");
 }
 
 // formatPct01 renders a 0..1 ratio as a rounded whole-percent string.

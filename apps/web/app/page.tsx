@@ -6,7 +6,7 @@ import type { AdType } from "@/lib/types";
 import { AuthMenu } from "@/components/AuthMenu";
 import { useAuth } from "@/lib/auth-context";
 import { saveAnalysis } from "@/lib/history";
-import { formatPct01 } from "@/lib/utils";
+import { formatContrastScore, formatPct01 } from "@/lib/utils";
 
 // 6 truthful feature cards — each one maps to actual capability in the codebase.
 const FEATURES = [
@@ -471,7 +471,7 @@ function AnalysisResultsInline({
               {[
                 ["Whitespace", formatPct01(result.metrics.whitespaceRatio)],
                 ["Visual density", formatPct01(result.metrics.visualDensity)],
-                ["Contrast", `${result.metrics.contrastScore.toFixed(1)}:1`],
+                ["Contrast", formatContrastScore(result.metrics.contrastScore, outcome.source)],
                 ["CTA saliency", formatPct01(result.metrics.ctaSaliencyScore)],
               ].map(([label, val]) => (
                 <div key={label} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 8, padding: "10px 12px" }}>
