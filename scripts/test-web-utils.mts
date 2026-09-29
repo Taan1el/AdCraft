@@ -35,6 +35,9 @@ import {
   assert.equal(formatContrastScore(0.5, "remote"), "50%");
   assert.equal(formatContrastScore(1, "remote"), "100%");
   assert.equal(formatContrastScore(4.56, "local"), "4.6:1");
+  assert.equal(formatContrastScore(-1, "local"), "0.0:1");
+  assert.equal(formatContrastScore(NaN, "local"), "0.0:1");
+  assert.equal(formatContrastScore(Infinity, "local"), "0.0:1");
 }
 
 // formatPct01 renders a 0..1 ratio as a rounded whole-percent string.

@@ -14,7 +14,9 @@ export function formatContrastScore(
   score: number,
   source: "remote" | "local",
 ): string {
-  return source === "remote" ? formatPct01(score) : `${score.toFixed(1)}:1`;
+  if (source === "remote") return formatPct01(score);
+  const ratio = Number.isFinite(score) ? Math.max(0, score) : 0;
+  return `${ratio.toFixed(1)}:1`;
 }
 
 export function shouldActivateUploadZone(
