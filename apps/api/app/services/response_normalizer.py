@@ -71,4 +71,9 @@ def validate_analysis_response(data: dict[str, Any]) -> None:
         validate(instance=data, schema=ANALYSIS_RESPONSE_SCHEMA)
     except ValidationError as e:
         raise InvalidModelOutput(f"Model JSON failed schema validation: {e.message}") from e
+    for annotation in data["annotations"]:
+        if annotation["w"] <= 0 or annotation["h"] <= 0:
+            raise InvalidModelOutput("Model annotation boxes must have positive width and height")
+        if annotation["x"] + annotation["w"] > 1 or annotation["y"] + annotation["h"] > 1:
+            raise InvalidModelOutput("Model annotation boxes must stay within the image bounds")
 

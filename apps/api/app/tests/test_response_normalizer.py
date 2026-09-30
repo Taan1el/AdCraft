@@ -198,3 +198,21 @@ def test_validate_rejects_non_positive_image_dimensions(field: str, value: int) 
 
     with pytest.raises(InvalidModelOutput, match="schema validation"):
         validate_analysis_response(broken)
+
+
+@pytest.mark.parametrize(("field", "value"), [("w", 0), ("h", 0)])
+def test_validate_rejects_zero_area_annotations(field: str, value: int) -> None:
+    broken = deepcopy(_valid_response())
+    broken["annotations"][0][field] = value
+
+    with pytest.raises(InvalidModelOutput, match="positive width and height"):
+        validate_analysis_response(broken)
+
+
+@pytest.mark.parametrize(("field", "value"), [("x", 0.8), ("y", 0.95)])
+def test_validate_rejects_annotations_outside_image(field: str, value: float) -> None:
+    broken = deepcopy(_valid_response())
+    broken["annotations"][0][field] = value
+
+    with pytest.raises(InvalidModelOutput, match="within the image bounds"):
+        validate_analysis_response(broken)
