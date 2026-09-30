@@ -16,12 +16,15 @@ ANALYSIS_RESPONSE_SCHEMA: dict = {
         "metrics",
     ],
     "properties": {
-        "analysisId": {"type": "string"},
+        "analysisId": NON_BLANK_STRING,
         "image": {
             "type": "object",
             "additionalProperties": False,
             "required": ["width", "height"],
-            "properties": {"width": {"type": "integer"}, "height": {"type": "integer"}},
+            "properties": {
+                "width": {"type": "integer", "minimum": 1},
+                "height": {"type": "integer", "minimum": 1},
+            },
         },
         "overallScore": {"type": "integer", "minimum": 0, "maximum": 100},
         "summary": NON_BLANK_STRING,
@@ -82,9 +85,9 @@ ANALYSIS_RESPONSE_SCHEMA: dict = {
                 "additionalProperties": False,
                 "required": ["id", "type", "label", "x", "y", "w", "h"],
                 "properties": {
-                    "id": {"type": "string"},
+                    "id": NON_BLANK_STRING,
                     "type": {"const": "box"},
-                    "label": {"type": "string"},
+                    "label": NON_BLANK_STRING,
                     "x": {"type": "number", "minimum": 0, "maximum": 1},
                     "y": {"type": "number", "minimum": 0, "maximum": 1},
                     "w": {"type": "number", "minimum": 0, "maximum": 1},

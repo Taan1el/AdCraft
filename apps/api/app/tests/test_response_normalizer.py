@@ -163,6 +163,7 @@ def test_validate_rejects_off_contract_recommendation_priority() -> None:
 @pytest.mark.parametrize(
     ("section", "field"),
     [
+        (None, "analysisId"),
         (None, "summary"),
         ("issues", "id"),
         ("issues", "category"),
@@ -172,6 +173,8 @@ def test_validate_rejects_off_contract_recommendation_priority() -> None:
         ("recommendations", "category"),
         ("recommendations", "title"),
         ("recommendations", "action"),
+        ("annotations", "id"),
+        ("annotations", "label"),
     ],
 )
 @pytest.mark.parametrize("blank", ["", " \t\n"])
@@ -183,6 +186,15 @@ def test_validate_rejects_blank_model_owned_text(
     broken = deepcopy(_valid_response())
     target = broken if section is None else broken[section][0]
     target[field] = blank
+
+    with pytest.raises(InvalidModelOutput, match="schema validation"):
+        validate_analysis_response(broken)
+
+
+@pytest.mark.parametrize(("field", "value"), [("width", 0), ("height", -1)])
+def test_validate_rejects_non_positive_image_dimensions(field: str, value: int) -> None:
+    broken = deepcopy(_valid_response())
+    broken["image"][field] = value
 
     with pytest.raises(InvalidModelOutput, match="schema validation"):
         validate_analysis_response(broken)
