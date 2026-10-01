@@ -19,13 +19,20 @@ def _get_optional_secret(name: str) -> str | None:
     return value.strip() or None
 
 
+def _get_nonempty(name: str, default: str) -> str:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip() or default
+
+
 class Settings:
     def __init__(self) -> None:
         self.debug = _get_bool("DEBUG", False)
         self.openai_api_key = _get_optional_secret("OPENAI_API_KEY")
-        self.openai_model = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
+        self.openai_model = _get_nonempty("OPENAI_MODEL", "gpt-4.1-mini")
         self.gemini_api_key = _get_optional_secret("GEMINI_API_KEY")
-        self.gemini_model = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
+        self.gemini_model = _get_nonempty("GEMINI_MODEL", "gemini-flash-latest")
         self.mock_analysis = _get_bool("MOCK_ANALYSIS", False)
         self.allowed_origins = os.getenv(
             "ALLOWED_ORIGINS",

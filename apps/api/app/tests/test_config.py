@@ -39,6 +39,26 @@ def test_api_keys_trim_accidental_outer_whitespace(monkeypatch: MonkeyPatch) -> 
     assert settings.has_llm_credentials is True
 
 
+def test_model_names_trim_outer_whitespace(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENAI_MODEL", "  gpt-test  ")
+    monkeypatch.setenv("GEMINI_MODEL", "  gemini-test\t")
+
+    settings = Settings()
+
+    assert settings.openai_model == "gpt-test"
+    assert settings.gemini_model == "gemini-test"
+
+
+def test_blank_model_names_use_defaults(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENAI_MODEL", "   ")
+    monkeypatch.setenv("GEMINI_MODEL", "\t")
+
+    settings = Settings()
+
+    assert settings.openai_model == "gpt-4.1-mini"
+    assert settings.gemini_model == "gemini-flash-latest"
+
+
 def test_create_app_uses_configured_debug_mode(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr(main.settings, "debug", True)
 
