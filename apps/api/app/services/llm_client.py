@@ -108,7 +108,9 @@ def call_openai_responses_api(
         raise LLMError(f"OpenAI request failed: {e}") from e
 
     if res.status_code >= 400:
-        raise LLMError(f"OpenAI error {res.status_code}: {res.text[:4000]}")
+        # Provider error bodies are not trusted diagnostics. They may echo
+        # request content or account details, and LLMError can reach logs.
+        raise LLMError(f"OpenAI error {res.status_code}")
 
     data = _response_json("OpenAI", res)
     if isinstance(data, dict):
@@ -176,7 +178,8 @@ def call_gemini_generate_content(
         raise LLMError(f"Gemini request failed: {e}") from e
 
     if res.status_code >= 400:
-        raise LLMError(f"Gemini error {res.status_code}: {res.text[:4000]}")
+        # Keep logs useful without copying potentially sensitive provider data.
+        raise LLMError(f"Gemini error {res.status_code}")
 
     data = _response_json("Gemini", res)
     # Mirror the OpenAI path: a valid-JSON but non-object body (e.g. a top-level

@@ -171,13 +171,15 @@ def test_openai_unextractable_output_raises(monkeypatch: MonkeyPatch) -> None:
 
 def test_openai_http_error_status_is_wrapped(monkeypatch: MonkeyPatch) -> None:
     request = httpx.Request("POST", "https://api.openai.com/v1/responses")
-    response = httpx.Response(500, text="upstream boom", request=request)
+    response = httpx.Response(500, text="secret echoed prompt", request=request)
     _patch_client(monkeypatch, _FakeClient(response))
 
-    with pytest.raises(LLMError, match=r"OpenAI error 500"):
+    with pytest.raises(LLMError) as exc_info:
         llm_client.call_openai_responses_api(
             api_key="k", model="m", prompt_text="p", image=_tiny_image()
         )
+    assert str(exc_info.value) == "OpenAI error 500"
+    assert "secret echoed prompt" not in str(exc_info.value)
 
 
 def test_openai_request_exception_is_wrapped(monkeypatch: MonkeyPatch) -> None:
@@ -284,13 +286,15 @@ def test_gemini_non_dict_candidate_does_not_leak_attribute_error(monkeypatch: Mo
 
 def test_gemini_http_error_status_is_wrapped(monkeypatch: MonkeyPatch) -> None:
     request = httpx.Request("POST", "https://generativelanguage.googleapis.com")
-    response = httpx.Response(429, text="rate limited", request=request)
+    response = httpx.Response(429, text="secret echoed prompt", request=request)
     _patch_client(monkeypatch, _FakeClient(response))
 
-    with pytest.raises(LLMError, match=r"Gemini error 429"):
+    with pytest.raises(LLMError) as exc_info:
         llm_client.call_gemini_generate_content(
             api_key="k", model="m", prompt_text="p", image=_tiny_image()
         )
+    assert str(exc_info.value) == "Gemini error 429"
+    assert "secret echoed prompt" not in str(exc_info.value)
 
 
 def test_gemini_request_exception_is_wrapped(monkeypatch: MonkeyPatch) -> None:
