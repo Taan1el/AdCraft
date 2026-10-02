@@ -12,7 +12,7 @@
     "dev": "npm run dev:api & npm run dev:web",
     "dev:worker": "npm --workspace apps/worker run dev",
     "deploy:worker": "npm --workspace apps/worker run deploy",
-    "test": "npm run test:worker && npm run test:web-config && npm run test:web-api && npm run test:web-heuristics && npm run test:web-aggregates && npm run test:web-utils && npm run test:web-categories",
+    "test": "npm run test:worker && npm run test:web-config && npm run test:web-api && npm run test:web-heuristics && npm run test:web-aggregates && npm run test:web-utils && npm run test:web-categories && npm run test:web-fallback",
     "test:worker": "node scripts/test-worker.mts",
     "test:web-api": "node scripts/test-web-api.mts",
     "test:web-config": "node scripts/test-web-api-config.mts",
@@ -20,6 +20,7 @@
     "test:web-aggregates": "node scripts/test-web-aggregates.mts",
     "test:web-utils": "node scripts/test-web-utils.mts",
     "test:web-categories": "node scripts/test-web-categories.mts",
+    "test:web-fallback": "node scripts/test-web-fallback.mts",
     "lint:web": "npm --workspace apps/web run lint",
     "typecheck:web": "npm --workspace apps/web run typecheck"
   }
