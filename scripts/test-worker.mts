@@ -45,6 +45,24 @@ const empty = await analyze(emptyForm);
 assert.equal(empty.status, 400);
 assert.equal((await empty.json() as { error?: string }).error, "Uploaded file is empty");
 
+// The 20MB upload cap is a DoS boundary: the worker rejects an oversized file
+// with a 413 before reading its bytes or checking its signature, so a huge
+// upload can't be used to force heavy work. One byte over the limit must trip
+// it; the signature is deliberately junk to prove the size gate fires first.
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
+const tooLargeForm = new FormData();
+tooLargeForm.set(
+  "file",
+  new File([new Uint8Array(MAX_UPLOAD_BYTES + 1)], "huge.png", { type: "image/png" }),
+);
+tooLargeForm.set("adType", "display_ad");
+const tooLarge = await analyze(tooLargeForm);
+assert.equal(tooLarge.status, 413);
+assert.equal(
+  (await tooLarge.json() as { error?: string }).error,
+  "Uploaded file is too large",
+);
+
 const unsupportedForm = new FormData();
 unsupportedForm.set("file", new File(["not an image"], "creative.txt", { type: "text/plain" }));
 unsupportedForm.set("adType", "display_ad");
