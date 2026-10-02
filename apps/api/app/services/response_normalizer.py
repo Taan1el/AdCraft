@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from typing import Any
 
 from jsonschema import ValidationError, validate
@@ -67,13 +68,33 @@ def parse_json_object(text: str) -> dict[str, Any]:
 
 
 def validate_analysis_response(data: dict[str, Any]) -> None:
+    for value in _numeric_values(data):
+        if not math.isfinite(value):
+            raise InvalidModelOutput("Model JSON numbers must be finite")
     try:
         validate(instance=data, schema=ANALYSIS_RESPONSE_SCHEMA)
     except ValidationError as e:
         raise InvalidModelOutput(f"Model JSON failed schema validation: {e.message}") from e
+    for collection_name in ("issues", "recommendations", "annotations"):
+        ids = [item["id"] for item in data[collection_name]]
+        if len(ids) != len(set(ids)):
+            raise InvalidModelOutput(f"Model {collection_name} must use unique IDs")
     for annotation in data["annotations"]:
         if annotation["w"] <= 0 or annotation["h"] <= 0:
             raise InvalidModelOutput("Model annotation boxes must have positive width and height")
         if annotation["x"] + annotation["w"] > 1 or annotation["y"] + annotation["h"] > 1:
             raise InvalidModelOutput("Model annotation boxes must stay within the image bounds")
+
+
+def _numeric_values(value: Any):
+    if isinstance(value, bool):
+        return
+    if isinstance(value, (int, float)):
+        yield value
+    elif isinstance(value, dict):
+        for child in value.values():
+            yield from _numeric_values(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _numeric_values(child)
 

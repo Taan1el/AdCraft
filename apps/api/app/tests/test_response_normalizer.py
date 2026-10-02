@@ -216,3 +216,31 @@ def test_validate_rejects_annotations_outside_image(field: str, value: float) ->
 
     with pytest.raises(InvalidModelOutput, match="within the image bounds"):
         validate_analysis_response(broken)
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_validate_rejects_non_finite_numbers(value: float) -> None:
+    broken = deepcopy(_valid_response())
+    broken["metrics"]["contrastScore"] = value
+
+    with pytest.raises(InvalidModelOutput, match="must be finite"):
+        validate_analysis_response(broken)
+
+
+@pytest.mark.parametrize("section", ["issues", "recommendations", "annotations"])
+def test_validate_rejects_duplicate_collection_ids(section: str) -> None:
+    broken = deepcopy(_valid_response())
+    broken[section].append(deepcopy(broken[section][0]))
+
+    with pytest.raises(InvalidModelOutput, match=f"{section} must use unique IDs"):
+        validate_analysis_response(broken)
+
+
+@pytest.mark.parametrize("section", ["issues", "recommendations", "annotations"])
+def test_validate_caps_model_owned_collections(section: str) -> None:
+    broken = deepcopy(_valid_response())
+    template = broken[section][0]
+    broken[section] = [dict(template, id=f"item_{index}") for index in range(21)]
+
+    with pytest.raises(InvalidModelOutput, match="schema validation"):
+        validate_analysis_response(broken)

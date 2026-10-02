@@ -50,6 +50,7 @@ ANALYSIS_RESPONSE_SCHEMA: dict = {
         },
         "issues": {
             "type": "array",
+            "maxItems": 20,
             "items": {
                 "type": "object",
                 "additionalProperties": False,
@@ -65,6 +66,7 @@ ANALYSIS_RESPONSE_SCHEMA: dict = {
         },
         "recommendations": {
             "type": "array",
+            "maxItems": 20,
             "items": {
                 "type": "object",
                 "additionalProperties": False,
@@ -80,6 +82,7 @@ ANALYSIS_RESPONSE_SCHEMA: dict = {
         },
         "annotations": {
             "type": "array",
+            "maxItems": 20,
             "items": {
                 "type": "object",
                 "additionalProperties": False,
