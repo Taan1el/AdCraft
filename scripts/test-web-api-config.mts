@@ -14,4 +14,21 @@ assert.equal(
   "outer whitespace and every trailing slash must be removed",
 );
 
+assert.equal(
+  normalizeApiBase("https://api.example.test/v1///"),
+  "https://api.example.test/v1",
+  "path-based API deployments must remain supported",
+);
+
+for (const unsafe of [
+  "not a URL",
+  "/relative-api",
+  "ftp://api.example.test",
+  "https://user:secret@api.example.test",
+  "https://api.example.test?token=secret",
+  "https://api.example.test#fragment",
+]) {
+  assert.equal(normalizeApiBase(unsafe), null, `unsafe API base must be rejected: ${unsafe}`);
+}
+
 console.log("Web API configuration tests passed.");
