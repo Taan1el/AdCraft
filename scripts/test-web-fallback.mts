@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import {
   RemoteAnalyzeError,
+  remoteAnalyzeErrorMessage,
   shouldFallBackToLocal,
 } from "../apps/web/lib/analyze-fallback.ts";
 
@@ -16,6 +17,13 @@ import {
   assert.equal(shouldFallBackToLocal(new RemoteAnalyzeError(422, "unprocessable")), false);
   // The upper edge of the client-error range is still a surface-to-user case.
   assert.equal(shouldFallBackToLocal(new RemoteAnalyzeError(499, "client closed")), false);
+}
+
+// Response bodies can contain proxy HTML, stack traces, or provider details.
+// User-visible failures expose only the status code.
+{
+  assert.equal(remoteAnalyzeErrorMessage(400), "Analyze request failed with HTTP 400");
+  assert.equal(remoteAnalyzeErrorMessage(503), "Analyze request failed with HTTP 503");
 }
 
 // 408 (request timeout) and 429 (rate limit) are the two 4xx codes the local

@@ -16,6 +16,10 @@ export class RemoteAnalyzeError extends Error {
   }
 }
 
+export function remoteAnalyzeErrorMessage(status: number): string {
+  return `Analyze request failed with HTTP ${status}`;
+}
+
 // Decide whether a failed remote analyze should quietly fall back to the local
 // heuristic path (true) or surface to the user (false).
 //

@@ -1,7 +1,11 @@
 import type { AdType, AnalysisResponse } from "@/lib/types";
 import { analyzeLocally } from "@/lib/heuristics";
 import { normalizeApiBase } from "@/lib/api-config";
-import { RemoteAnalyzeError, shouldFallBackToLocal } from "@/lib/analyze-fallback";
+import {
+  RemoteAnalyzeError,
+  remoteAnalyzeErrorMessage,
+  shouldFallBackToLocal,
+} from "@/lib/analyze-fallback";
 
 export type AnalyzeInput = {
   file: File;
@@ -47,10 +51,9 @@ async function tryRemote(base: string, input: AnalyzeInput): Promise<AnalysisRes
   try {
     const res = await fetch(`${base}/analyze`, { method: "POST", body: fd, signal: ctrl.signal });
     if (!res.ok) {
-      const text = await res.text().catch(() => "");
       throw new RemoteAnalyzeError(
         res.status,
-        `Analyze failed (${res.status}): ${text || res.statusText}`,
+        remoteAnalyzeErrorMessage(res.status),
       );
     }
     return (await res.json()) as AnalysisResponse;
