@@ -344,6 +344,11 @@ def test_pipeline_does_not_retry_provider_failures(monkeypatch: MonkeyPatch) -> 
     assert calls == 1
     validate(instance=result, schema=ANALYSIS_RESPONSE_SCHEMA)
     assert result["image"] == {"width": 600, "height": 315}
+    # A key IS configured; the provider merely failed. The fallback summary must
+    # not tell the user to add a key they already have — it should read as the
+    # deterministic baseline for a temporarily unavailable critique.
+    assert "adding an API key" not in result["summary"]
+    assert "deterministic fallback" in result["summary"]
 
 
 def test_pipeline_without_any_llm_key_falls_back_to_base_response(

@@ -121,10 +121,22 @@ def run_analysis(
             }
         )
 
-    summary = (
-        f"Mock analysis for {ad_type}. This score is grounded in basic visual metrics "
-        f"(contrast, density, whitespace, CTA saliency). Enable real AI critique by adding an API key."
-    )
+    # This same base_response is returned for the mock path, the no-credentials
+    # path, AND as the fallback when a configured provider call fails. Only the
+    # first two should tell the user to add a key — a server that already has a
+    # key and just hit a transient LLM failure must not advise adding one it
+    # already has. Pick the summary from the actual configuration state.
+    if settings.mock_analysis or not settings.has_llm_credentials:
+        summary = (
+            f"Mock analysis for {ad_type}. This score is grounded in basic visual metrics "
+            f"(contrast, density, whitespace, CTA saliency). Enable real AI critique by adding an API key."
+        )
+    else:
+        summary = (
+            f"Baseline analysis for {ad_type}, grounded in basic visual metrics "
+            f"(contrast, density, whitespace, CTA saliency). AI critique was unavailable "
+            f"for this request, so this is the deterministic fallback."
+        )
 
     w, h = image.size
     base_response: dict = {
