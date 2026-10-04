@@ -126,7 +126,7 @@ def call_openai_responses_api(
                 for c in content:
                     if isinstance(c, dict) and c.get("type") in {"output_text", "text"}:
                         t = c.get("text")
-                        if isinstance(t, str):
+                        if isinstance(t, str) and t.strip():
                             texts.append(t)
             if texts:
                 return "\n".join(texts)
@@ -193,7 +193,13 @@ def call_gemini_generate_content(
         content = candidates[0].get("content")
         parts = content.get("parts") if isinstance(content, dict) else None
         if isinstance(parts, list):
-            texts = [p["text"] for p in parts if isinstance(p, dict) and isinstance(p.get("text"), str)]
+            texts = [
+                p["text"]
+                for p in parts
+                if isinstance(p, dict)
+                and isinstance(p.get("text"), str)
+                and p["text"].strip()
+            ]
             if texts:
                 return "\n".join(texts)
 

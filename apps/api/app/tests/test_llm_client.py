@@ -119,6 +119,21 @@ def test_openai_nested_output_text_is_joined(monkeypatch: MonkeyPatch) -> None:
     assert result == "first\nsecond"
 
 
+def test_openai_ignores_blank_output_text(monkeypatch: MonkeyPatch) -> None:
+    body: dict[str, Any] = {
+        "output_text": "   ",
+        "output": [{"content": [{"type": "output_text", "text": "\n\t"}]}],
+    }
+    request = httpx.Request("POST", "https://api.openai.com/v1/responses")
+    response = httpx.Response(200, content=json.dumps(body), request=request)
+    _patch_client(monkeypatch, _FakeClient(response))
+
+    with pytest.raises(LLMError, match="Could not extract output text"):
+        llm_client.call_openai_responses_api(
+            api_key="k", model="m", prompt_text="p", image=_tiny_image()
+        )
+
+
 class _RaisingClient:
     """Fake httpx.Client whose post() raises, exercising the request-failure path."""
 
@@ -205,6 +220,18 @@ def test_gemini_extracts_candidate_text(monkeypatch: MonkeyPatch) -> None:
         api_key="k", model="m", prompt_text="p", image=_tiny_image()
     )
     assert result == "line one\nline two"
+
+
+def test_gemini_ignores_blank_candidate_text(monkeypatch: MonkeyPatch) -> None:
+    body = {"candidates": [{"content": {"parts": [{"text": "  "}, {"text": "\n"}]}}]}
+    request = httpx.Request("POST", "https://generativelanguage.googleapis.com")
+    response = httpx.Response(200, content=json.dumps(body), request=request)
+    _patch_client(monkeypatch, _FakeClient(response))
+
+    with pytest.raises(LLMError, match="Could not extract text from Gemini"):
+        llm_client.call_gemini_generate_content(
+            api_key="k", model="m", prompt_text="p", image=_tiny_image()
+        )
 
 
 def test_gemini_missing_candidates_is_wrapped(monkeypatch: MonkeyPatch) -> None:
