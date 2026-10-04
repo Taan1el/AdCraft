@@ -36,3 +36,31 @@ def test_analyze_returns_503_when_llm_mode_without_keys() -> None:
             else:
                 os.environ[k] = v
         reload_analysis_stack()
+
+
+def test_analyze_gate_fires_before_image_decode() -> None:
+    # The credentials gate runs before any image work, so a non-mock, creds-less
+    # server returns 503 (server not configured) rather than decoding the upload
+    # and returning 400 for an unreadable file. Shape checks (file/adType/size)
+    # still run first, so this only reorders the gate relative to the decode.
+    saved = {k: os.environ.get(k) for k in ("MOCK_ANALYSIS", "OPENAI_API_KEY", "GEMINI_API_KEY")}
+    try:
+        os.environ["MOCK_ANALYSIS"] = "false"
+        os.environ.pop("OPENAI_API_KEY", None)
+        os.environ.pop("GEMINI_API_KEY", None)
+        app = reload_analysis_stack()
+        client = TestClient(app)
+        # A present-but-undecodable file: with the old ordering this reached the
+        # decode and returned 400; the gate now short-circuits it to 503.
+        files = {"file": ("not-an-image.png", b"this is plainly not a PNG", "image/png")}
+        data = {"adType": "display_ad"}
+        res = client.post("/analyze", files=files, data=data)
+        assert res.status_code == 503
+        assert "MOCK_ANALYSIS" in res.json()["error"]
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        reload_analysis_stack()

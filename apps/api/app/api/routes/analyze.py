@@ -70,6 +70,20 @@ async def _analyze_form(form: FormData) -> JSONResponse:
     if len(contents) > MAX_UPLOAD_BYTES:
         return JSONResponse({"error": "Uploaded file is too large"}, status_code=413)
 
+    # Fail fast on a misconfigured server before any image work. A creds-less,
+    # non-mock deploy can never complete an analysis, so decoding the upload
+    # (and running the decompression-bomb gauntlet) first just burns CPU on
+    # every request and widens the attack surface for a server that is down
+    # anyway. Shape validation (file/adType/size) still runs first so genuine
+    # client mistakes keep returning 400/413.
+    if not settings.mock_analysis and not settings.has_llm_credentials:
+        return JSONResponse(
+            {
+                "error": "Missing LLM credentials. Set GEMINI_API_KEY/OPENAI_API_KEY or set MOCK_ANALYSIS=true."
+            },
+            status_code=503,
+        )
+
     try:
         with Image.open(io.BytesIO(contents)) as source:
             if source.width * source.height > MAX_IMAGE_PIXELS:
@@ -86,14 +100,6 @@ async def _analyze_form(form: FormData) -> JSONResponse:
         )
     except (UnidentifiedImageError, OSError):
         return JSONResponse({"error": "Uploaded file is not a readable image"}, status_code=400)
-
-    if not settings.mock_analysis and not settings.has_llm_credentials:
-        return JSONResponse(
-            {
-                "error": "Missing LLM credentials. Set GEMINI_API_KEY/OPENAI_API_KEY or set MOCK_ANALYSIS=true."
-            },
-            status_code=503,
-        )
 
     result = await run_in_threadpool(
         run_analysis,
