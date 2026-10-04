@@ -105,7 +105,10 @@ def call_openai_responses_api(
         with httpx.Client(timeout=timeout_s) as client:
             res = client.post(url, headers=headers, content=json.dumps(body).encode("utf-8"))
     except Exception as e:  # noqa: BLE001
-        raise LLMError(f"OpenAI request failed: {e}") from e
+        # Exception text can contain proxy URLs, request metadata, or echoed
+        # content. Preserve the original as the chained cause for debugging,
+        # but keep the application-facing message free of provider data.
+        raise LLMError("OpenAI request failed") from e
 
     if res.status_code >= 400:
         # Provider error bodies are not trusted diagnostics. They may echo
@@ -175,7 +178,7 @@ def call_gemini_generate_content(
         with httpx.Client(timeout=timeout_s) as client:
             res = client.post(url, headers=headers, content=json.dumps(body).encode("utf-8"))
     except Exception as e:  # noqa: BLE001
-        raise LLMError(f"Gemini request failed: {e}") from e
+        raise LLMError("Gemini request failed") from e
 
     if res.status_code >= 400:
         # Keep logs useful without copying potentially sensitive provider data.

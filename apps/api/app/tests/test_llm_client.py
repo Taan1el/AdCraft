@@ -198,12 +198,14 @@ def test_openai_http_error_status_is_wrapped(monkeypatch: MonkeyPatch) -> None:
 
 
 def test_openai_request_exception_is_wrapped(monkeypatch: MonkeyPatch) -> None:
-    _patch_client(monkeypatch, _RaisingClient(httpx.ConnectError("no route")))
+    _patch_client(monkeypatch, _RaisingClient(httpx.ConnectError("secret proxy URL")))
 
-    with pytest.raises(LLMError, match="OpenAI request failed"):
+    with pytest.raises(LLMError) as exc_info:
         llm_client.call_openai_responses_api(
             api_key="k", model="m", prompt_text="p", image=_tiny_image()
         )
+    assert str(exc_info.value) == "OpenAI request failed"
+    assert "secret proxy URL" not in str(exc_info.value)
 
 
 def test_gemini_extracts_candidate_text(monkeypatch: MonkeyPatch) -> None:
@@ -325,9 +327,11 @@ def test_gemini_http_error_status_is_wrapped(monkeypatch: MonkeyPatch) -> None:
 
 
 def test_gemini_request_exception_is_wrapped(monkeypatch: MonkeyPatch) -> None:
-    _patch_client(monkeypatch, _RaisingClient(httpx.ReadTimeout("slow")))
+    _patch_client(monkeypatch, _RaisingClient(httpx.ReadTimeout("secret proxy URL")))
 
-    with pytest.raises(LLMError, match="Gemini request failed"):
+    with pytest.raises(LLMError) as exc_info:
         llm_client.call_gemini_generate_content(
             api_key="k", model="m", prompt_text="p", image=_tiny_image()
         )
+    assert str(exc_info.value) == "Gemini request failed"
+    assert "secret proxy URL" not in str(exc_info.value)
