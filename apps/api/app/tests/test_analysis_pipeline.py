@@ -344,3 +344,84 @@ def test_pipeline_does_not_retry_provider_failures(monkeypatch: MonkeyPatch) -> 
     assert calls == 1
     validate(instance=result, schema=ANALYSIS_RESPONSE_SCHEMA)
     assert result["image"] == {"width": 600, "height": 315}
+
+
+def test_pipeline_without_any_llm_key_falls_back_to_base_response(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    # mock_analysis is off but no provider key is configured. The attempt hits
+    # the "no API key configured" branch and raises LLMError, which must fall
+    # back to the deterministic base response rather than surface an error.
+    # Defense in depth: the route already gates on credentials, but the pipeline
+    # must fail safe on its own too.
+    monkeypatch.setattr(analysis_pipeline.settings, "mock_analysis", False)
+    monkeypatch.setattr(analysis_pipeline.settings, "gemini_api_key", None)
+    monkeypatch.setattr(analysis_pipeline.settings, "openai_api_key", None)
+
+    def _should_not_be_called(**_kwargs: object) -> str:
+        raise AssertionError("no provider should be called without a key")
+
+    monkeypatch.setattr(
+        analysis_pipeline, "call_gemini_generate_content", _should_not_be_called
+    )
+    monkeypatch.setattr(
+        analysis_pipeline, "call_openai_responses_api", _should_not_be_called
+    )
+
+    image = Image.new("RGB", (320, 200), (128, 128, 128))
+    result = analysis_pipeline.run_analysis(
+        image=image,
+        ad_type="social_ad",
+        campaign_goal=None,
+        audience=None,
+        brand_name=None,
+    )
+
+    # The deterministic base response is returned intact — same shape the mock
+    # path produces, including the "add an API key" hint in the summary.
+    from jsonschema import validate
+
+    validate(instance=result, schema=ANALYSIS_RESPONSE_SCHEMA)
+    assert "Enable real AI critique by adding an API key." in result["summary"]
+    assert result["image"] == {"width": 320, "height": 200}
+
+
+def test_pipeline_uses_openai_provider_when_only_openai_key_is_set(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    # The Gemini path is well covered; the OpenAI branch was not exercised at
+    # all. With only OPENAI_API_KEY set, the pipeline must route to the OpenAI
+    # client, parse its output, and still pin the server-owned fields.
+    image = Image.new("RGB", (600, 315), "white")
+
+    monkeypatch.setattr(analysis_pipeline.settings, "mock_analysis", False)
+    monkeypatch.setattr(analysis_pipeline.settings, "gemini_api_key", None)
+    monkeypatch.setattr(analysis_pipeline.settings, "openai_api_key", "test-key")
+
+    def _gemini_must_not_run(**_kwargs: object) -> str:
+        raise AssertionError("Gemini must not be called when only OpenAI is set")
+
+    monkeypatch.setattr(
+        analysis_pipeline, "call_gemini_generate_content", _gemini_must_not_run
+    )
+    monkeypatch.setattr(
+        analysis_pipeline,
+        "call_openai_responses_api",
+        lambda **_kwargs: _model_response_with_bogus_ground_truth(),
+    )
+
+    result = analysis_pipeline.run_analysis(
+        image=image,
+        ad_type="display_ad",
+        campaign_goal=None,
+        audience=None,
+        brand_name=None,
+    )
+
+    from jsonschema import validate
+
+    validate(instance=result, schema=ANALYSIS_RESPONSE_SCHEMA)
+    # The model's own critique survives (proving the OpenAI output was used)...
+    assert result["summary"] == "MODEL SUMMARY should survive"
+    # ...while the server-owned ground truth is pinned over the model's lies.
+    assert result["image"] == {"width": 600, "height": 315}
