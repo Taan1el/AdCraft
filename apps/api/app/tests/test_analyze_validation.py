@@ -181,3 +181,23 @@ def test_analyze_does_not_block_concurrent_health_request(monkeypatch: MonkeyPat
             assert analyze_response.status_code == 200
 
     asyncio.run(exercise_requests())
+
+
+def test_analyze_rejects_decompression_bomb(monkeypatch: MonkeyPatch) -> None:
+    # PIL raises DecompressionBombError when an image's declared dimensions far
+    # exceed the pixel ceiling — a classic denial-of-service vector. The route
+    # must translate that into a 413, not let it escape as an unhandled 500.
+    def _raise_bomb(*_args: object, **_kwargs: object) -> object:
+        raise analyze_route.Image.DecompressionBombError("image is a decompression bomb")
+
+    monkeypatch.setattr(analyze_route.Image, "open", _raise_bomb)
+    client = TestClient(app)
+
+    res = client.post(
+        "/analyze",
+        files={"file": ("bomb.png", _png_bytes(), "image/png")},
+        data={"adType": "display_ad"},
+    )
+
+    assert res.status_code == 413
+    assert res.json() == {"error": "Uploaded image has too many pixels"}
