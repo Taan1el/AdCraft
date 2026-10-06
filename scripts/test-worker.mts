@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 
 import worker from "../apps/worker/src/index.ts";
 
+const defaultImageBitmap = async () => ({ width: 1200, height: 600, close() {} });
+Object.assign(globalThis, { createImageBitmap: defaultImageBitmap });
+
 function uploadForm(adType?: FormDataEntryValue): FormData {
   const form = new FormData();
   form.set("file", new File([new Uint8Array([0])], "creative.png", { type: "image/png" }));
@@ -84,6 +87,21 @@ assert.equal(spoofed.status, 400);
 assert.equal(
   (await spoofed.json() as { error?: string }).error,
   "Uploaded file signature does not match its image type",
+);
+
+const unreadableForm = new FormData();
+unreadableForm.set(
+  "file",
+  new File([new Uint8Array(validSignatures[0].bytes)], "broken.png", { type: "image/png" }),
+);
+unreadableForm.set("adType", "display_ad");
+Object.assign(globalThis, { createImageBitmap: async () => { throw new Error("decode failed"); } });
+const unreadable = await analyze(unreadableForm);
+Object.assign(globalThis, { createImageBitmap: defaultImageBitmap });
+assert.equal(unreadable.status, 400);
+assert.equal(
+  (await unreadable.json() as { error?: string }).error,
+  "Uploaded file is not a readable image",
 );
 
 const corsResponse = await worker.fetch(

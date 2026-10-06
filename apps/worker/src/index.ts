@@ -151,16 +151,17 @@ function uniqueId(prefix: string) {
   return `${prefix}_${crypto.randomUUID()}`;
 }
 
-async function getImageSize(file: File): Promise<{ width: number; height: number }> {
+async function getImageSize(file: File): Promise<{ width: number; height: number } | null> {
   try {
     // Workers runtime supports createImageBitmap in most environments.
-    if (!createImageBitmap) return { width: 0, height: 0 };
+    if (!createImageBitmap) return null;
     const bmp = await createImageBitmap(file);
     const { width, height } = bmp;
     bmp.close?.();
-    return { width: width || 0, height: height || 0 };
+    if (!width || !height) return null;
+    return { width, height };
   } catch {
-    return { width: 0, height: 0 };
+    return null;
   }
 }
 
@@ -405,7 +406,15 @@ export default {
           json({ error: "Uploaded file signature does not match its image type" }, { status: 400 })
         );
       }
-      const { width, height } = await getImageSize(f);
+      const dimensions = await getImageSize(f);
+      if (!dimensions) {
+        return withCors(
+          req,
+          env,
+          json({ error: "Uploaded file is not a readable image" }, { status: 400 })
+        );
+      }
+      const { width, height } = dimensions;
 
       const scores = scoreFromHeuristics({ width, height, bytes, adType });
       const { issues, recommendations } = buildIssuesAndRecs({ scores, adType, width, height });
