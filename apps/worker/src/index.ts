@@ -63,6 +63,7 @@ type Env = {
 const ALLOWED_AD_TYPES = new Set<AdType>(["display_ad", "landing_hero", "email_hero", "social_ad"]);
 const ALLOWED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
+const MAX_IMAGE_PIXELS = 40_000_000;
 
 async function imageSignatureMatches(file: File, imageType: string): Promise<boolean> {
   try {
@@ -415,6 +416,13 @@ export default {
         );
       }
       const { width, height } = dimensions;
+      if (width * height > MAX_IMAGE_PIXELS) {
+        return withCors(
+          req,
+          env,
+          json({ error: "Uploaded image has too many pixels" }, { status: 413 })
+        );
+      }
 
       const scores = scoreFromHeuristics({ width, height, bytes, adType });
       const { issues, recommendations } = buildIssuesAndRecs({ scores, adType, width, height });

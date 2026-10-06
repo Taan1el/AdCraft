@@ -104,6 +104,23 @@ assert.equal(
   "Uploaded file is not a readable image",
 );
 
+const tooManyPixelsForm = new FormData();
+tooManyPixelsForm.set(
+  "file",
+  new File([new Uint8Array(validSignatures[0].bytes)], "huge-dimensions.png", { type: "image/png" }),
+);
+tooManyPixelsForm.set("adType", "display_ad");
+Object.assign(globalThis, {
+  createImageBitmap: async () => ({ width: 10_000, height: 5_000, close() {} }),
+});
+const tooManyPixels = await analyze(tooManyPixelsForm);
+Object.assign(globalThis, { createImageBitmap: defaultImageBitmap });
+assert.equal(tooManyPixels.status, 413);
+assert.equal(
+  (await tooManyPixels.json() as { error?: string }).error,
+  "Uploaded image has too many pixels",
+);
+
 const corsResponse = await worker.fetch(
   new Request("https://worker.test/health", {
     headers: { origin: "https://client.test" },
