@@ -85,6 +85,19 @@ def test_analyze_rejects_unreadable_image() -> None:
     assert res.json() == {"error": "Uploaded file is not a readable image"}
 
 
+def test_analyze_rejects_empty_upload() -> None:
+    client = TestClient(app)
+
+    res = client.post(
+        "/analyze",
+        files={"file": ("empty.png", b"", "image/png")},
+        data={"adType": "display_ad"},
+    )
+
+    assert res.status_code == 400
+    assert res.json() == {"error": "Uploaded file is empty"}
+
+
 def test_analyze_closes_uploaded_file_after_request() -> None:
     upload = UploadFile(file=BytesIO(_png_bytes()), filename="test.png")
     form = FormData([("file", upload), ("adType", "display_ad")])

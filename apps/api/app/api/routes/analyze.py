@@ -69,6 +69,8 @@ async def _analyze_form(form: FormData) -> JSONResponse:
     contents = await upload.read(MAX_UPLOAD_BYTES + 1)
     if len(contents) > MAX_UPLOAD_BYTES:
         return JSONResponse({"error": "Uploaded file is too large"}, status_code=413)
+    if not contents:
+        return JSONResponse({"error": "Uploaded file is empty"}, status_code=400)
 
     # Fail fast on a misconfigured server before any image work. A creds-less,
     # non-mock deploy can never complete an analysis, so decoding the upload
