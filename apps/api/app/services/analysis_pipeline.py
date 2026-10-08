@@ -171,6 +171,7 @@ def run_analysis(
                 model=settings.gemini_model,
                 prompt_text=prompt_text,
                 image=image,
+                timeout_s=settings.llm_timeout_s,
             )
         elif settings.openai_api_key:
             raw = call_openai_responses_api(
@@ -178,6 +179,7 @@ def run_analysis(
                 model=settings.openai_model,
                 prompt_text=prompt_text,
                 image=image,
+                timeout_s=settings.llm_timeout_s,
             )
         else:
             raise LLMError("No LLM API key configured (set GEMINI_API_KEY or OPENAI_API_KEY).")

@@ -26,6 +26,23 @@ def _get_nonempty(name: str, default: str) -> str:
     return value.strip() or default
 
 
+def _get_positive_float(name: str, default: float) -> float:
+    """Read a positive float env var, falling back to `default`.
+
+    A missing, blank, non-numeric, or non-positive value yields the default so a
+    typo (or a stray "0"/"-1") can't silently disable the request timeout and let
+    a single /analyze call hang indefinitely on a stalled provider connection.
+    """
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        value = float(raw.strip())
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
 class Settings:
     def __init__(self) -> None:
         self.debug = _get_bool("DEBUG", False)
@@ -33,6 +50,10 @@ class Settings:
         self.openai_model = _get_nonempty("OPENAI_MODEL", "gpt-4.1-mini")
         self.gemini_api_key = _get_optional_secret("GEMINI_API_KEY")
         self.gemini_model = _get_nonempty("GEMINI_MODEL", "gemini-flash-latest")
+        # Per-request LLM HTTP timeout (seconds). Bounds how long a single
+        # provider call may block; /analyze can make two (an initial call plus
+        # one repair retry), so worst-case latency is ~2x this.
+        self.llm_timeout_s = _get_positive_float("LLM_TIMEOUT_S", 45.0)
         self.mock_analysis = _get_bool("MOCK_ANALYSIS", False)
         self.allowed_origins = os.getenv(
             "ALLOWED_ORIGINS",

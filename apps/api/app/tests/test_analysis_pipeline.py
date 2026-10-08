@@ -430,3 +430,53 @@ def test_pipeline_uses_openai_provider_when_only_openai_key_is_set(
     assert result["summary"] == "MODEL SUMMARY should survive"
     # ...while the server-owned ground truth is pinned over the model's lies.
     assert result["image"] == {"width": 600, "height": 315}
+
+
+def test_pipeline_passes_configured_llm_timeout_to_gemini(monkeypatch: MonkeyPatch) -> None:
+    image = Image.new("RGB", (600, 315), "white")
+    captured: dict[str, object] = {}
+
+    def capture(**kwargs: object) -> str:
+        captured.update(kwargs)
+        return _model_response_with_bogus_ground_truth()
+
+    monkeypatch.setattr(analysis_pipeline.settings, "mock_analysis", False)
+    monkeypatch.setattr(analysis_pipeline.settings, "gemini_api_key", "test-key")
+    monkeypatch.setattr(analysis_pipeline.settings, "openai_api_key", None)
+    monkeypatch.setattr(analysis_pipeline.settings, "llm_timeout_s", 7.5)
+    monkeypatch.setattr(analysis_pipeline, "call_gemini_generate_content", capture)
+
+    analysis_pipeline.run_analysis(
+        image=image,
+        ad_type="display_ad",
+        campaign_goal=None,
+        audience=None,
+        brand_name=None,
+    )
+
+    assert captured["timeout_s"] == 7.5
+
+
+def test_pipeline_passes_configured_llm_timeout_to_openai(monkeypatch: MonkeyPatch) -> None:
+    image = Image.new("RGB", (600, 315), "white")
+    captured: dict[str, object] = {}
+
+    def capture(**kwargs: object) -> str:
+        captured.update(kwargs)
+        return _model_response_with_bogus_ground_truth()
+
+    monkeypatch.setattr(analysis_pipeline.settings, "mock_analysis", False)
+    monkeypatch.setattr(analysis_pipeline.settings, "gemini_api_key", None)
+    monkeypatch.setattr(analysis_pipeline.settings, "openai_api_key", "test-key")
+    monkeypatch.setattr(analysis_pipeline.settings, "llm_timeout_s", 20.0)
+    monkeypatch.setattr(analysis_pipeline, "call_openai_responses_api", capture)
+
+    analysis_pipeline.run_analysis(
+        image=image,
+        ad_type="display_ad",
+        campaign_goal=None,
+        audience=None,
+        brand_name=None,
+    )
+
+    assert captured["timeout_s"] == 20.0

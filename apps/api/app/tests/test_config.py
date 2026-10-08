@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from pytest import MonkeyPatch
 
 from app import main
@@ -57,6 +58,28 @@ def test_blank_model_names_use_defaults(monkeypatch: MonkeyPatch) -> None:
 
     assert settings.openai_model == "gpt-4.1-mini"
     assert settings.gemini_model == "gemini-flash-latest"
+
+
+def test_llm_timeout_defaults_to_45(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.delenv("LLM_TIMEOUT_S", raising=False)
+
+    assert Settings().llm_timeout_s == 45.0
+
+
+def test_llm_timeout_reads_positive_override(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_TIMEOUT_S", "12.5")
+
+    assert Settings().llm_timeout_s == 12.5
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "abc", "   ", ""])
+def test_llm_timeout_falls_back_on_invalid_or_nonpositive(
+    monkeypatch: MonkeyPatch, value: str
+) -> None:
+    # A stray 0/-1/typo must not disable the timeout and let a call hang forever.
+    monkeypatch.setenv("LLM_TIMEOUT_S", value)
+
+    assert Settings().llm_timeout_s == 45.0
 
 
 def test_create_app_uses_configured_debug_mode(monkeypatch: MonkeyPatch) -> None:
