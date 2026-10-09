@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   RemoteAnalyzeError,
   shouldFallBackToLocal,
+  isAnalysisResponseShape,
 } from "../apps/web/lib/analyze-fallback.ts";
 
 // Client errors (4xx) the user must see — an invalid, oversized, or unsupported
@@ -54,6 +55,57 @@ import {
   assert.equal(shouldFallBackToLocal(undefined), true);
   assert.equal(shouldFallBackToLocal(null), true);
   assert.equal(shouldFallBackToLocal({ status: 404 }), true, "a plain lookalike object is not a RemoteAnalyzeError");
+}
+
+// isAnalysisResponseShape guards against a 200 whose body is not an
+// AnalysisResponse. A well-formed response passes; non-response bodies (an
+// error envelope, an empty/HTML body, an array, or one missing a required
+// top-level field) are rejected so api.ts can fall back to local heuristics.
+{
+  const valid = {
+    analysisId: "analysis_1",
+    image: { width: 1200, height: 600 },
+    overallScore: 72,
+    summary: "ok",
+    categoryScores: {
+      visualHierarchy: 70,
+      ctaProminence: 68,
+      copyClarity: 72,
+      readability: 78,
+      layoutBalance: 74,
+      trustSignals: 66,
+    },
+    issues: [],
+    recommendations: [{ id: "rec_1", category: "ctaProminence", priority: "medium", title: "t", action: "a" }],
+    annotations: [],
+    metrics: { whitespaceRatio: 0.2, visualDensity: 0.5, contrastScore: 0.6, ctaSaliencyScore: 0.5 },
+  };
+  assert.equal(isAnalysisResponseShape(valid), true, "a well-formed response must pass");
+
+  // A valid body stays valid even if issues is non-empty (shallow check only).
+  assert.equal(
+    isAnalysisResponseShape({ ...valid, issues: [{ id: "i", category: "readability", severity: "high", title: "t", description: "d" }] }),
+    true,
+  );
+
+  for (const bad of [
+    null,
+    undefined,
+    "a string",
+    42,
+    [],
+    {},
+    { error: "Unsupported image type" },
+    { ...valid, overallScore: "72" },
+    { ...valid, overallScore: Number.NaN },
+    { ...valid, categoryScores: null },
+    { ...valid, metrics: [] },
+    { ...valid, issues: "nope" },
+    { ...valid, recommendations: undefined },
+    (() => { const { annotations: _omit, ...rest } = valid; return rest; })(),
+  ]) {
+    assert.equal(isAnalysisResponseShape(bad), false, `malformed body must be rejected: ${JSON.stringify(bad)}`);
+  }
 }
 
 console.log("web api fallback policy: ok");

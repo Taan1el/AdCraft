@@ -5,6 +5,7 @@ import {
   RemoteAnalyzeError,
   remoteAnalyzeErrorMessage,
   shouldFallBackToLocal,
+  isAnalysisResponseShape,
 } from "@/lib/analyze-fallback";
 
 export type AnalyzeInput = {
@@ -56,7 +57,16 @@ async function tryRemote(base: string, input: AnalyzeInput): Promise<AnalysisRes
         remoteAnalyzeErrorMessage(res.status),
       );
     }
-    return (await res.json()) as AnalysisResponse;
+    // A 200 is not a guarantee of a well-formed body: a proxy error page, an
+    // empty body, or an `{ error }` envelope would otherwise be handed to the
+    // UI as a "successful" analysis. Reject a non-response body here; the plain
+    // Error routes analyzeCreative to the same local-heuristic fallback a
+    // network failure takes, so the user still gets an analysis.
+    const body: unknown = await res.json().catch(() => null);
+    if (!isAnalysisResponseShape(body)) {
+      throw new Error("Remote backend returned a malformed analysis response");
+    }
+    return body;
   } finally {
     clearTimeout(t);
   }
