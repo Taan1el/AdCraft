@@ -64,6 +64,11 @@ const ALLOWED_AD_TYPES = new Set<AdType>(["display_ad", "landing_hero", "email_h
 const ALLOWED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 const MAX_IMAGE_PIXELS = 40_000_000;
+// How long a browser may cache this CORS preflight (seconds). Without it the
+// default is a few seconds, so the SPA re-sends an OPTIONS before nearly every
+// /analyze POST — a wasted round-trip on each upload. One hour is the ceiling
+// Chromium honours; Firefox caps at 24h, so this is the effective shared max.
+const CORS_MAX_AGE_SECONDS = 3600;
 
 async function imageSignatureMatches(file: File, imageType: string): Promise<boolean> {
   try {
@@ -322,7 +327,11 @@ export default {
     const url = new URL(req.url);
 
     if (req.method === "OPTIONS") {
-      return withCors(req, env, new Response(null, { status: 204 }));
+      // Cache the preflight so the browser stops re-asking before each POST.
+      // withCors copies existing headers, so this survives the wrapper.
+      const preflight = new Response(null, { status: 204 });
+      preflight.headers.set("access-control-max-age", String(CORS_MAX_AGE_SECONDS));
+      return withCors(req, env, preflight);
     }
 
     if (url.pathname === "/health") {

@@ -145,6 +145,21 @@ assert.equal(preflight.status, 204);
 assert.equal(preflight.headers.get("access-control-allow-origin"), "https://client.test");
 assert.equal(preflight.headers.get("access-control-allow-methods"), "GET,POST,OPTIONS");
 assert.equal(preflight.headers.get("access-control-allow-headers"), "content-type");
+// The preflight carries a positive max-age so the browser caches it and stops
+// re-sending an OPTIONS before every /analyze POST.
+const preflightMaxAge = Number(preflight.headers.get("access-control-max-age"));
+assert.ok(
+  Number.isInteger(preflightMaxAge) && preflightMaxAge > 0,
+  "preflight must advertise a positive access-control-max-age",
+);
+
+// A non-preflight response does NOT advertise a preflight cache lifetime —
+// access-control-max-age only has meaning on the OPTIONS response.
+const nonPreflightCors = await worker.fetch(
+  new Request("https://worker.test/health", { headers: { origin: "https://client.test" } }),
+  { ALLOWED_ORIGINS: "https://client.test" },
+);
+assert.equal(nonPreflightCors.headers.get("access-control-max-age"), null);
 
 // An origin that is NOT in ALLOWED_ORIGINS must never receive an
 // access-control-allow-origin header (the browser then blocks the read), but
