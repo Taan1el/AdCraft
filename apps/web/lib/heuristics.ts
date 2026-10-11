@@ -9,6 +9,7 @@
 import type {
   AdType,
   AnalysisResponse,
+  Annotation,
   CategoryScores,
   Issue,
   Recommendation,
@@ -455,6 +456,47 @@ export function buildRecommendations(m: Metrics, scores: CategoryScores): Recomm
   return out;
 }
 
+// Overlay boxes for the annotated preview. The remote API and the Cloudflare
+// Worker both return pixel-anchored boxes, but the local heuristic path used to
+// return none — leaving the "Annotated preview" panel empty whenever analysis
+// ran offline or fell back. These boxes are anchored to regions this module
+// actually measures, so they reinforce the issues/recommendations with spatial
+// context instead of being decorative. Every box is kept within the image
+// (x+w <= 1, y+h <= 1), matching the invariant the API enforces on model output.
+export function buildAnnotations(m: Metrics): Annotation[] {
+  const out: Annotation[] = [];
+
+  // The lower band ctaSaliency() scores for a "pop" (y >= 0.6). Highlighting it
+  // shows where a CTA is expected to live, and pairs with the "CTA doesn't pop"
+  // issue when saliency is weak.
+  out.push({
+    id: "cta-region",
+    type: "box",
+    label: "CTA region",
+    x: 0.08,
+    y: 0.6,
+    w: 0.84,
+    h: 0.34,
+  });
+
+  // Flag the headline band when measured contrast is below WCAG AA (4.5:1) —
+  // the same threshold the "contrast-low" issue uses. Coords mirror the API's
+  // ann_low_contrast box so the overlay reads the same across backends.
+  if (m.contrastScore < 4.5) {
+    out.push({
+      id: "low-contrast",
+      type: "box",
+      label: "Possible low-contrast area",
+      x: 0.06,
+      y: 0.06,
+      w: 0.88,
+      h: 0.24,
+    });
+  }
+
+  return out;
+}
+
 export function buildSummary(scores: CategoryScores, overall: number): string {
   const weakest = (Object.entries(scores) as [keyof CategoryScores, number][])
     .sort((a, b) => a[1] - b[1])[0];
@@ -488,6 +530,7 @@ export async function analyzeLocally(
 
   const issues = buildIssues(m, scores);
   const recommendations = buildRecommendations(m, scores);
+  const annotations = buildAnnotations(m);
 
   return {
     analysisId: `local-${Date.now().toString(36)}`,
@@ -497,7 +540,7 @@ export async function analyzeLocally(
     categoryScores: scores,
     issues,
     recommendations,
-    annotations: [],
+    annotations,
     metrics: {
       whitespaceRatio: Number(m.whitespaceRatio.toFixed(3)),
       visualDensity: Number(m.visualDensity.toFixed(3)),

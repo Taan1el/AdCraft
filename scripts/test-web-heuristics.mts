@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import {
   aspectScore,
+  buildAnnotations,
   buildIssues,
   buildRecommendations,
   buildSummary,
@@ -411,6 +412,40 @@ console.log("Heuristic score-mapping curve tests passed.");
   const grey = { r: 128, g: 128, b: 128 };
   const gl = luminance(grey);
   assert.ok(gl > 0 && gl < 1, "mid grey luminance lies between black and white");
+}
+
+// buildAnnotations: the local heuristic path must emit the same kind of
+// pixel-anchored overlay boxes the remote/worker paths do, so the annotated
+// preview isn't empty offline. Every box must be a "box" within image bounds.
+{
+  const inBounds = (a: { x: number; y: number; w: number; h: number }) =>
+    a.x >= 0 && a.y >= 0 && a.w > 0 && a.h > 0 && a.x + a.w <= 1 && a.y + a.h <= 1;
+
+  // Healthy contrast (>= 4.5:1): only the CTA-region box, no low-contrast flag.
+  const good = buildAnnotations({ ...baseMetrics, contrastScore: 7 } as never);
+  assert.ok(good.length >= 1, "a CTA-region box is always emitted");
+  assert.ok(good.every((a) => a.type === "box"), "every annotation is a box");
+  assert.ok(good.every(inBounds), "every box stays within the image");
+  assert.ok(
+    good.some((a) => a.id === "cta-region"),
+    "the CTA region is always annotated",
+  );
+  assert.ok(
+    !good.some((a) => a.id === "low-contrast"),
+    "no low-contrast box when contrast is healthy",
+  );
+
+  // Poor contrast (< 4.5:1): the low-contrast headline box appears too.
+  const poor = buildAnnotations({ ...baseMetrics, contrastScore: 2.5 } as never);
+  assert.ok(poor.every(inBounds), "every box stays within the image");
+  assert.ok(
+    poor.some((a) => a.id === "low-contrast"),
+    "low contrast adds a headline-band box",
+  );
+
+  // Unique ids, matching the invariant the API enforces on its annotations.
+  const ids = poor.map((a) => a.id);
+  assert.equal(ids.length, new Set(ids).size, "annotation ids are unique");
 }
 
 console.log("Heuristic color-math tests passed.");
