@@ -302,6 +302,27 @@ for (const [key, value] of Object.entries(body.metrics)) {
 
 assert.ok(Array.isArray(body.issues), "issues must be an array");
 assert.ok(Array.isArray(body.annotations), "annotations must be an array");
+
+// Annotation boxes overlay the uploaded image, so their normalized coordinates
+// must stay inside it: x/y/w/h in [0, 1] with x+w <= 1 and y+h <= 1, and a
+// non-empty box (w, h > 0). The local heuristic path and the Python API both
+// enforce this invariant; pin it on the worker too so a future box tweak can't
+// ship coordinates that render outside the creative (or an empty box). The
+// success path above decodes a 1200x600 image, so at least one box is present.
+type Box = { id: string; type: string; label: string; x: number; y: number; w: number; h: number };
+assert.ok(body.annotations.length >= 1, "a decodable image should yield at least one annotation box");
+for (const raw of body.annotations) {
+  const box = raw as Box;
+  assert.equal(box.type, "box", `annotation ${box.id} must be a box`);
+  assert.ok(typeof box.label === "string" && box.label.length > 0, `annotation ${box.id} needs a label`);
+  const within01 = (n: unknown): boolean => typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= 1;
+  for (const [key, value] of [["x", box.x], ["y", box.y], ["w", box.w], ["h", box.h]] as const) {
+    assert.ok(within01(value), `annotation ${box.id} ${key}=${value} must be a ratio in [0, 1]`);
+  }
+  assert.ok(box.w > 0 && box.h > 0, `annotation ${box.id} must be a non-empty box`);
+  assert.ok(box.x + box.w <= 1 + 1e-9, `annotation ${box.id} overflows the right edge (x+w=${box.x + box.w})`);
+  assert.ok(box.y + box.h <= 1 + 1e-9, `annotation ${box.id} overflows the bottom edge (y+h=${box.y + box.h})`);
+}
 // The builder guarantees at least one recommendation even when no issue fires.
 assert.ok(
   Array.isArray(body.recommendations) && body.recommendations.length >= 1,
