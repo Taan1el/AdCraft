@@ -2,9 +2,35 @@
 
 import type { Annotation } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type Box = { left: number; top: number; width: number; height: number; label: string; id: string };
+
+type ImgRect = { w: number; h: number; left: number; top: number };
+
+// The image renders with object-contain, so it is letterboxed inside its
+// element: the visible picture is scaled to fit and centered, leaving bars on
+// the long axis. Annotation coordinates are normalized to the *image*, so
+// overlay boxes must be placed against that contained picture — not the element
+// box. Using the element box (as this did before) floated every box into the
+// letterbox gap whenever the image's aspect ratio differed from the element's.
+// Returns the contained picture's rect relative to `wrap`, or null before the
+// image has reported its natural size.
+function containedImageRect(img: HTMLImageElement, wrap: HTMLElement): ImgRect | null {
+  const { naturalWidth, naturalHeight } = img;
+  if (!naturalWidth || !naturalHeight) return null;
+  const ir = img.getBoundingClientRect();
+  const wr = wrap.getBoundingClientRect();
+  const scale = Math.min(ir.width / naturalWidth, ir.height / naturalHeight);
+  const contentW = naturalWidth * scale;
+  const contentH = naturalHeight * scale;
+  return {
+    w: contentW,
+    h: contentH,
+    left: ir.left - wr.left + (ir.width - contentW) / 2,
+    top: ir.top - wr.top + (ir.height - contentH) / 2,
+  };
+}
 
 export function AnnotatedPreview({
   file,
@@ -15,30 +41,28 @@ export function AnnotatedPreview({
 }) {
   const imgRef = useRef<HTMLImageElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
-  const [imgRect, setImgRect] = useState<{ w: number; h: number; left: number; top: number } | null>(
-    null
-  );
+  const [imgRect, setImgRect] = useState<ImgRect | null>(null);
 
   const url = useMemo(() => URL.createObjectURL(file), [file]);
 
+  const measure = useCallback(() => {
+    const img = imgRef.current;
+    const wrap = wrapRef.current;
+    if (!img || !wrap) return;
+    const rect = containedImageRect(img, wrap);
+    if (rect) setImgRect(rect);
+  }, []);
+
   useEffect(() => {
-    function compute() {
-      const img = imgRef.current;
-      const wrap = wrapRef.current;
-      if (!img || !wrap) return;
-      const ir = img.getBoundingClientRect();
-      const wr = wrap.getBoundingClientRect();
-      setImgRect({ w: ir.width, h: ir.height, left: ir.left - wr.left, top: ir.top - wr.top });
-    }
-    compute();
-    const ro = new ResizeObserver(compute);
+    measure();
+    const ro = new ResizeObserver(measure);
     if (wrapRef.current) ro.observe(wrapRef.current);
-    window.addEventListener("resize", compute);
+    window.addEventListener("resize", measure);
     return () => {
       ro.disconnect();
-      window.removeEventListener("resize", compute);
+      window.removeEventListener("resize", measure);
     };
-  }, []);
+  }, [measure]);
 
   const boxes: Box[] = useMemo(() => {
     if (!imgRect) return [];
@@ -68,14 +92,8 @@ export function AnnotatedPreview({
           alt="Creative with annotations"
           className="h-[420px] w-full object-contain"
           onLoad={() => {
-            setTimeout(() => {
-              const img = imgRef.current;
-              const wrap = wrapRef.current;
-              if (!img || !wrap) return;
-              const ir = img.getBoundingClientRect();
-              const wr = wrap.getBoundingClientRect();
-              setImgRect({ w: ir.width, h: ir.height, left: ir.left - wr.left, top: ir.top - wr.top });
-            }, 0);
+            // Defer a tick so layout has settled before reading the rendered box.
+            setTimeout(measure, 0);
           }}
         />
 
