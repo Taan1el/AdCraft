@@ -116,25 +116,31 @@ def call_openai_responses_api(
         raise LLMError(f"OpenAI error {res.status_code}")
 
     data = _response_json("OpenAI", res)
-    if isinstance(data, dict):
-        if isinstance(data.get("output_text"), str) and data["output_text"].strip():
-            return data["output_text"]
-        output = data.get("output")
-        if isinstance(output, list):
-            texts: list[str] = []
-            for item in output:
-                content = item.get("content") if isinstance(item, dict) else None
-                if not isinstance(content, list):
-                    continue
-                for c in content:
-                    if isinstance(c, dict) and c.get("type") in {"output_text", "text"}:
-                        t = c.get("text")
-                        if isinstance(t, str) and t.strip():
-                            texts.append(t)
-            if texts:
-                return "\n".join(texts)
+    # Guard a valid-JSON but non-object body (e.g. a top-level array from an
+    # error proxy) up front, the same way the Gemini path does, so a non-dict
+    # can never reach the data.get() calls below and surface as an opaque
+    # AttributeError instead of a clean provider error.
+    if not isinstance(data, dict):
+        raise LLMError("OpenAI returned unexpected JSON shape (expected an object)")
 
-    reason = _openai_no_text_reason(data) if isinstance(data, dict) else None
+    if isinstance(data.get("output_text"), str) and data["output_text"].strip():
+        return data["output_text"]
+    output = data.get("output")
+    if isinstance(output, list):
+        texts: list[str] = []
+        for item in output:
+            content = item.get("content") if isinstance(item, dict) else None
+            if not isinstance(content, list):
+                continue
+            for c in content:
+                if isinstance(c, dict) and c.get("type") in {"output_text", "text"}:
+                    t = c.get("text")
+                    if isinstance(t, str) and t.strip():
+                        texts.append(t)
+        if texts:
+            return "\n".join(texts)
+
+    reason = _openai_no_text_reason(data)
     suffix = f" ({reason})" if reason else ""
     raise LLMError(f"Could not extract output text from OpenAI response{suffix}")
 
