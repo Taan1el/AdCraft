@@ -181,7 +181,11 @@ function measureBrightness(d: ImageData): { mean: number; std: number; whitespac
   return { mean, std: Math.sqrt(variance), whitespace: bright / n };
 }
 
-// rough CTA saliency: how strongly the bottom third "pops" via saturated color + edges
+// Rough CTA saliency: the mean color saturation of the bottom 40% of the image
+// (y >= 0.6), where a CTA is expected to live. Higher saturation reads as a
+// region that "pops". This measures saturation only — edge density is scored
+// separately in sobelEdgeRatio — and the band is the bottom 40%, not a third,
+// to match buildAnnotations' CTA-region box.
 function ctaSaliency(d: ImageData): number {
   const { width: w, height: h, data } = d;
   const yStart = Math.floor(h * 0.6);
