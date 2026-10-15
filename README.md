@@ -59,6 +59,7 @@ flowchart LR
 |------|------|
 | [apps/web](apps/web) | Next.js UI (static export for GitHub Pages) |
 | [apps/api](apps/api) | Starlette API: `GET /health`, `POST /analyze` |
+| [apps/worker](apps/worker) | Cloudflare Worker alternative for upload validation, analysis, and CORS handling |
 | [packages/shared-types](packages/shared-types) | Shared TypeScript types consumed by the web app |
 
 ---
@@ -99,7 +100,7 @@ test scripts need **Node 22.18+ or 24** (older Node exits with
 `ERR_UNKNOWN_FILE_EXTENSION`). From the repo root:
 
 ```bash
-npm test                     # runs all seven suites below in sequence
+npm test                     # runs all eight suites below in sequence
 npm run test:worker          # Cloudflare Worker request/CORS behavior
 npm run test:web-config      # browser API base resolution
 npm run test:web-api         # remote-analyze fallback policy
@@ -107,6 +108,7 @@ npm run test:web-heuristics  # client-side Sobel edge ratios + issue/rec taxonom
 npm run test:web-aggregates  # aggregate reducer basics + non-finite resilience
 npm run test:web-utils       # shared web utility helpers
 npm run test:web-categories  # score → category mapping
+npm run test:web-fallback    # local fallback response normalization and validation
 ```
 
 The API is covered by `pytest`:
