@@ -52,27 +52,56 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-// Shallow shape check for a remote /analyze body. A backend can answer 200 with
+function hasFiniteNumbers(value: Record<string, unknown>, fields: readonly string[]): boolean {
+  return fields.every(
+    (field) => typeof value[field] === "number" && Number.isFinite(value[field]),
+  );
+}
+
+// Required-field shape check for a remote /analyze body. A backend can answer 200 with
 // a body that is not an AnalysisResponse at all — an HTML error page from a
 // proxy, an empty body, or a `{ "error": ... }` envelope — and `res.ok` alone
 // would hand that straight to the UI as a "successful" analysis, rendering
 // garbage or crashing a component that reads `categoryScores`/`metrics`.
 //
-// The check is deliberately shallow: it asserts the top-level fields the UI
-// unconditionally reads (a numeric score, the score/metric objects, and the
-// three list fields) exist with the right coarse type, without validating every
-// nested value. That is enough to reject a non-response body while staying
-// lenient toward valid responses whose optional nested fields vary — a strict
-// deep check could reject a legitimate backend variant and wrongly suppress a
-// real result. A false result routes the caller to the same local-heuristic
-// fallback a network error already takes.
+// Validate every required scalar the UI reads while leaving list-item details
+// open to compatible backend variants. A false result routes the caller to the
+// same local-heuristic fallback a network error already takes.
 export function isAnalysisResponseShape(value: unknown): value is AnalysisResponse {
   if (!isRecord(value)) return false;
   if (typeof value.overallScore !== "number" || !Number.isFinite(value.overallScore)) {
     return false;
   }
-  if (!isRecord(value.categoryScores) || !isRecord(value.metrics)) return false;
+  if (!isRecord(value.image) || !hasFiniteNumbers(value.image, ["width", "height"])) {
+    return false;
+  }
+  if (
+    !isRecord(value.categoryScores) ||
+    !hasFiniteNumbers(value.categoryScores, [
+      "visualHierarchy",
+      "ctaProminence",
+      "copyClarity",
+      "readability",
+      "layoutBalance",
+      "trustSignals",
+    ])
+  ) {
+    return false;
+  }
+  if (
+    !isRecord(value.metrics) ||
+    !hasFiniteNumbers(value.metrics, [
+      "whitespaceRatio",
+      "visualDensity",
+      "contrastScore",
+      "ctaSaliencyScore",
+    ])
+  ) {
+    return false;
+  }
   return (
+    typeof value.analysisId === "string" &&
+    typeof value.summary === "string" &&
     Array.isArray(value.issues) &&
     Array.isArray(value.recommendations) &&
     Array.isArray(value.annotations)

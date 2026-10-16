@@ -1,10 +1,51 @@
 import assert from "node:assert/strict";
 
 import {
+  isAnalysisResponseShape,
   RemoteAnalyzeError,
   remoteAnalyzeErrorMessage,
   shouldFallBackToLocal,
 } from "../apps/web/lib/analyze-fallback.ts";
+
+const validAnalysis = {
+  analysisId: "analysis_1",
+  image: { width: 1200, height: 600 },
+  overallScore: 75,
+  summary: "Clear hierarchy",
+  categoryScores: {
+    visualHierarchy: 75,
+    ctaProminence: 70,
+    copyClarity: 72,
+    readability: 78,
+    layoutBalance: 74,
+    trustSignals: 68,
+  },
+  issues: [],
+  recommendations: [],
+  annotations: [],
+  metrics: {
+    whitespaceRatio: 0.28,
+    visualDensity: 0.45,
+    contrastScore: 0.62,
+    ctaSaliencyScore: 0.55,
+  },
+};
+
+assert.equal(isAnalysisResponseShape(validAnalysis), true);
+
+for (const malformed of [
+  { ...validAnalysis, image: { width: "1200", height: 600 } },
+  { ...validAnalysis, categoryScores: { ...validAnalysis.categoryScores, readability: Number.NaN } },
+  { ...validAnalysis, metrics: { ...validAnalysis.metrics, contrastScore: undefined } },
+  { ...validAnalysis, analysisId: null },
+  { ...validAnalysis, summary: null },
+]) {
+  assert.equal(
+    isAnalysisResponseShape(malformed),
+    false,
+    "malformed nested response fields must be rejected before reaching the UI",
+  );
+}
 
 // A 4xx client error (other than 408/429) means the upload itself was rejected —
 // invalid, oversized, unauthorized. Running it through local heuristics would
