@@ -108,8 +108,27 @@ function allowedOrigins(env: Env): string[] {
   return [...new Set(
     raw
       .split(",")
-      .map((s) => s.trim().replace(/\/+$/, ""))
-      .filter(Boolean),
+      .map((entry) => {
+        const value = entry.trim();
+        if (value === "*") return value;
+        try {
+          const url = new URL(value);
+          if (
+            !["http:", "https:"].includes(url.protocol) ||
+            url.username ||
+            url.password ||
+            (url.pathname !== "/" && url.pathname !== "") ||
+            url.search ||
+            url.hash
+          ) {
+            return null;
+          }
+          return url.origin;
+        } catch {
+          return null;
+        }
+      })
+      .filter((origin): origin is string => origin !== null),
   )];
 }
 

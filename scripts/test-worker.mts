@@ -131,6 +131,28 @@ assert.equal(corsResponse.status, 200);
 assert.equal(corsResponse.headers.get("access-control-allow-origin"), "https://client.test");
 assert.equal(corsResponse.headers.get("vary"), "origin");
 
+// Config entries are origins, not URL prefixes. Canonicalize harmless spelling
+// differences, but ignore paths, credentials, and non-HTTP schemes so a typo
+// cannot silently widen or misstate the CORS policy.
+const canonicalCors = await worker.fetch(
+  new Request("https://worker.test/health", {
+    headers: { origin: "https://client.test" },
+  }),
+  {
+    ALLOWED_ORIGINS:
+      "HTTPS://CLIENT.TEST:443/, https://client.test/app, https://user@client.test, javascript:alert(1)",
+  },
+);
+assert.equal(canonicalCors.headers.get("access-control-allow-origin"), "https://client.test");
+
+const pathOnlyCors = await worker.fetch(
+  new Request("https://worker.test/health", {
+    headers: { origin: "https://client.test" },
+  }),
+  { ALLOWED_ORIGINS: "https://client.test/app" },
+);
+assert.equal(pathOnlyCors.headers.get("access-control-allow-origin"), null);
+
 // An OPTIONS preflight short-circuits to 204 (no body) but must still carry the
 // full CORS handshake: the echoed allow-origin for an allowed caller plus the
 // method/header allowances a browser checks before sending the real POST.
