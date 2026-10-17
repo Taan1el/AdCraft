@@ -45,6 +45,8 @@ export function AnnotatedPreview({
 
   const url = useMemo(() => URL.createObjectURL(file), [file]);
 
+  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+
   const measure = useCallback(() => {
     const img = imgRef.current;
     const wrap = wrapRef.current;
