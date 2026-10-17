@@ -58,6 +58,41 @@ function hasFiniteNumbers(value: Record<string, unknown>, fields: readonly strin
   );
 }
 
+function hasNumbersInRange(
+  value: Record<string, unknown>,
+  fields: readonly string[],
+  min: number,
+  max: number,
+): boolean {
+  return fields.every((field) => {
+    const candidate = value[field];
+    return typeof candidate === "number" && Number.isFinite(candidate) && candidate >= min && candidate <= max;
+  });
+}
+
+function hasStrings(value: Record<string, unknown>, fields: readonly string[]): boolean {
+  return fields.every((field) => typeof value[field] === "string");
+}
+
+function isIssue(value: unknown): boolean {
+  return isRecord(value) && hasStrings(value, ["id", "category", "severity", "title", "description"]);
+}
+
+function isRecommendation(value: unknown): boolean {
+  return isRecord(value) && hasStrings(value, ["id", "category", "priority", "title", "action"]);
+}
+
+function isAnnotation(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    value.type === "box" &&
+    hasStrings(value, ["id", "label"]) &&
+    hasNumbersInRange(value, ["x", "y", "w", "h"], 0, 1) &&
+    (value.x as number) + (value.w as number) <= 1 &&
+    (value.y as number) + (value.h as number) <= 1
+  );
+}
+
 // Required-field shape check for a remote /analyze body. A backend can answer 200 with
 // a body that is not an AnalysisResponse at all — an HTML error page from a
 // proxy, an empty body, or a `{ "error": ... }` envelope — and `res.ok` alone
@@ -69,41 +104,48 @@ function hasFiniteNumbers(value: Record<string, unknown>, fields: readonly strin
 // same local-heuristic fallback a network error already takes.
 export function isAnalysisResponseShape(value: unknown): value is AnalysisResponse {
   if (!isRecord(value)) return false;
-  if (typeof value.overallScore !== "number" || !Number.isFinite(value.overallScore)) {
+  if (!hasNumbersInRange(value, ["overallScore"], 0, 100)) {
     return false;
   }
-  if (!isRecord(value.image) || !hasFiniteNumbers(value.image, ["width", "height"])) {
+  if (
+    !isRecord(value.image) ||
+    !hasFiniteNumbers(value.image, ["width", "height"]) ||
+    !Number.isInteger(value.image.width) ||
+    !Number.isInteger(value.image.height) ||
+    value.image.width <= 0 ||
+    value.image.height <= 0
+  ) {
     return false;
   }
   if (
     !isRecord(value.categoryScores) ||
-    !hasFiniteNumbers(value.categoryScores, [
+    !hasNumbersInRange(value.categoryScores, [
       "visualHierarchy",
       "ctaProminence",
       "copyClarity",
       "readability",
       "layoutBalance",
       "trustSignals",
-    ])
+    ], 0, 100)
   ) {
     return false;
   }
   if (
     !isRecord(value.metrics) ||
-    !hasFiniteNumbers(value.metrics, [
+    !hasNumbersInRange(value.metrics, [
       "whitespaceRatio",
       "visualDensity",
       "contrastScore",
       "ctaSaliencyScore",
-    ])
+    ], 0, 1)
   ) {
     return false;
   }
   return (
     typeof value.analysisId === "string" &&
     typeof value.summary === "string" &&
-    Array.isArray(value.issues) &&
-    Array.isArray(value.recommendations) &&
-    Array.isArray(value.annotations)
+    Array.isArray(value.issues) && value.issues.every(isIssue) &&
+    Array.isArray(value.recommendations) && value.recommendations.every(isRecommendation) &&
+    Array.isArray(value.annotations) && value.annotations.every(isAnnotation)
   );
 }

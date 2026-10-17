@@ -35,8 +35,18 @@ assert.equal(isAnalysisResponseShape(validAnalysis), true);
 
 for (const malformed of [
   { ...validAnalysis, image: { width: "1200", height: 600 } },
+  { ...validAnalysis, image: { width: 1200.5, height: 600 } },
+  { ...validAnalysis, overallScore: 101 },
+  { ...validAnalysis, categoryScores: { ...validAnalysis.categoryScores, readability: -1 } },
   { ...validAnalysis, categoryScores: { ...validAnalysis.categoryScores, readability: Number.NaN } },
+  { ...validAnalysis, metrics: { ...validAnalysis.metrics, contrastScore: 1.1 } },
   { ...validAnalysis, metrics: { ...validAnalysis.metrics, contrastScore: undefined } },
+  { ...validAnalysis, issues: [null] },
+  { ...validAnalysis, recommendations: [{ id: "rec_1" }] },
+  {
+    ...validAnalysis,
+    annotations: [{ id: "box_1", type: "box", label: "CTA", x: 0.8, y: 0.1, w: 0.3, h: 0.2 }],
+  },
   { ...validAnalysis, analysisId: null },
   { ...validAnalysis, summary: null },
 ]) {
