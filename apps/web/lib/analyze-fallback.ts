@@ -52,12 +52,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function hasFiniteNumbers(value: Record<string, unknown>, fields: readonly string[]): boolean {
-  return fields.every(
-    (field) => typeof value[field] === "number" && Number.isFinite(value[field]),
-  );
-}
-
 function hasNumbersInRange(
   value: Record<string, unknown>,
   fields: readonly string[],
@@ -72,6 +66,10 @@ function hasNumbersInRange(
 
 function hasStrings(value: Record<string, unknown>, fields: readonly string[]): boolean {
   return fields.every((field) => typeof value[field] === "string");
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
 }
 
 function isIssue(value: unknown): boolean {
@@ -109,11 +107,8 @@ export function isAnalysisResponseShape(value: unknown): value is AnalysisRespon
   }
   if (
     !isRecord(value.image) ||
-    !hasFiniteNumbers(value.image, ["width", "height"]) ||
-    !Number.isInteger(value.image.width) ||
-    !Number.isInteger(value.image.height) ||
-    value.image.width <= 0 ||
-    value.image.height <= 0
+    !isPositiveInteger(value.image.width) ||
+    !isPositiveInteger(value.image.height)
   ) {
     return false;
   }
