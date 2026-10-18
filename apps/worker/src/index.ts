@@ -148,7 +148,7 @@ function methodNotAllowed(req: Request, env: Env, methods: string[]): Response {
   return withCors(req, env, res);
 }
 
-function withCors(req: Request, env: Env, res: Response): Response {
+function withCors(req: Request, env: Env, res: Response, methods = ["GET", "POST", "OPTIONS"]): Response {
   const origin = req.headers.get("origin");
   const allowed = allowedOrigins(env);
   const h = new Headers(res.headers);
@@ -163,7 +163,7 @@ function withCors(req: Request, env: Env, res: Response): Response {
   if (origin && (allowed.includes(origin) || allowed.includes("*"))) {
     h.set("access-control-allow-origin", origin);
   }
-  h.set("access-control-allow-methods", "GET,POST,OPTIONS");
+  h.set("access-control-allow-methods", methods.join(","));
   h.set("access-control-allow-headers", "content-type");
   return new Response(res.body, { status: res.status, headers: h });
 }
@@ -346,11 +346,15 @@ export default {
     const url = new URL(req.url);
 
     if (req.method === "OPTIONS") {
+      const methods = ROUTE_METHODS[url.pathname];
+      if (!methods) {
+        return withCors(req, env, json({ error: "Not found" }, { status: 404 }));
+      }
       // Cache the preflight so the browser stops re-asking before each POST.
       // withCors copies existing headers, so this survives the wrapper.
       const preflight = new Response(null, { status: 204 });
       preflight.headers.set("access-control-max-age", String(CORS_MAX_AGE_SECONDS));
-      return withCors(req, env, preflight);
+      return withCors(req, env, preflight, methods);
     }
 
     if (url.pathname === "/health") {

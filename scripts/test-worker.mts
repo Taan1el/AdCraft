@@ -165,7 +165,7 @@ const preflight = await worker.fetch(
 );
 assert.equal(preflight.status, 204);
 assert.equal(preflight.headers.get("access-control-allow-origin"), "https://client.test");
-assert.equal(preflight.headers.get("access-control-allow-methods"), "GET,POST,OPTIONS");
+assert.equal(preflight.headers.get("access-control-allow-methods"), "POST,OPTIONS");
 assert.equal(preflight.headers.get("access-control-allow-headers"), "content-type");
 // The preflight carries a positive max-age so the browser caches it and stops
 // re-sending an OPTIONS before every /analyze POST.
@@ -174,6 +174,26 @@ assert.ok(
   Number.isInteger(preflightMaxAge) && preflightMaxAge > 0,
   "preflight must advertise a positive access-control-max-age",
 );
+
+const healthPreflight = await worker.fetch(
+  new Request("https://worker.test/health", {
+    method: "OPTIONS",
+    headers: { origin: "https://client.test" },
+  }),
+  { ALLOWED_ORIGINS: "https://client.test" },
+);
+assert.equal(healthPreflight.status, 204);
+assert.equal(healthPreflight.headers.get("access-control-allow-methods"), "GET,HEAD,OPTIONS");
+
+const unknownPreflight = await worker.fetch(
+  new Request("https://worker.test/nope", {
+    method: "OPTIONS",
+    headers: { origin: "https://client.test" },
+  }),
+  { ALLOWED_ORIGINS: "https://client.test" },
+);
+assert.equal(unknownPreflight.status, 404);
+assert.equal((await unknownPreflight.json() as { error?: string }).error, "Not found");
 
 // A non-preflight response does NOT advertise a preflight cache lifetime —
 // access-control-max-age only has meaning on the OPTIONS response.
