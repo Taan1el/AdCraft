@@ -45,10 +45,20 @@ for (const malformed of [
   { ...validAnalysis, recommendations: [{ id: "rec_1" }] },
   {
     ...validAnalysis,
+    issues: [{ id: "issue_1", category: "layout", severity: "high", title: "   ", description: "Crowded" }],
+  },
+  {
+    ...validAnalysis,
+    recommendations: [{ id: "rec_1", category: "layout", priority: "high", title: "Simplify", action: "" }],
+  },
+  {
+    ...validAnalysis,
     annotations: [{ id: "box_1", type: "box", label: "CTA", x: 0.8, y: 0.1, w: 0.3, h: 0.2 }],
   },
   { ...validAnalysis, analysisId: null },
+  { ...validAnalysis, analysisId: "   " },
   { ...validAnalysis, summary: null },
+  { ...validAnalysis, summary: "\t" },
 ]) {
   assert.equal(
     isAnalysisResponseShape(malformed),

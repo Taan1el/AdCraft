@@ -64,8 +64,11 @@ function hasNumbersInRange(
   });
 }
 
-function hasStrings(value: Record<string, unknown>, fields: readonly string[]): boolean {
-  return fields.every((field) => typeof value[field] === "string");
+function hasNonEmptyStrings(value: Record<string, unknown>, fields: readonly string[]): boolean {
+  return fields.every((field) => {
+    const candidate = value[field];
+    return typeof candidate === "string" && candidate.trim().length > 0;
+  });
 }
 
 function isPositiveInteger(value: unknown): value is number {
@@ -73,18 +76,18 @@ function isPositiveInteger(value: unknown): value is number {
 }
 
 function isIssue(value: unknown): boolean {
-  return isRecord(value) && hasStrings(value, ["id", "category", "severity", "title", "description"]);
+  return isRecord(value) && hasNonEmptyStrings(value, ["id", "category", "severity", "title", "description"]);
 }
 
 function isRecommendation(value: unknown): boolean {
-  return isRecord(value) && hasStrings(value, ["id", "category", "priority", "title", "action"]);
+  return isRecord(value) && hasNonEmptyStrings(value, ["id", "category", "priority", "title", "action"]);
 }
 
 function isAnnotation(value: unknown): boolean {
   return (
     isRecord(value) &&
     value.type === "box" &&
-    hasStrings(value, ["id", "label"]) &&
+    hasNonEmptyStrings(value, ["id", "label"]) &&
     hasNumbersInRange(value, ["x", "y", "w", "h"], 0, 1) &&
     (value.x as number) + (value.w as number) <= 1 &&
     (value.y as number) + (value.h as number) <= 1
@@ -137,8 +140,8 @@ export function isAnalysisResponseShape(value: unknown): value is AnalysisRespon
     return false;
   }
   return (
-    typeof value.analysisId === "string" &&
-    typeof value.summary === "string" &&
+    typeof value.analysisId === "string" && value.analysisId.trim().length > 0 &&
+    typeof value.summary === "string" && value.summary.trim().length > 0 &&
     Array.isArray(value.issues) && value.issues.every(isIssue) &&
     Array.isArray(value.recommendations) && value.recommendations.every(isRecommendation) &&
     Array.isArray(value.annotations) && value.annotations.every(isAnnotation)
