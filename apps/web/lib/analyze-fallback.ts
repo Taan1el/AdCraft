@@ -89,6 +89,13 @@ function isAnnotation(value: unknown): boolean {
     value.type === "box" &&
     hasNonEmptyStrings(value, ["id", "label"]) &&
     hasNumbersInRange(value, ["x", "y", "w", "h"], 0, 1) &&
+    // A box must enclose a real region. hasNumbersInRange admits 0, but a
+    // zero-width or zero-height box is degenerate — it renders as an invisible
+    // overlay that marks nothing. The API's own validator rejects w/h <= 0, so
+    // require positive extents here too rather than accept a box no foreign or
+    // drifted backend should ever emit.
+    (value.w as number) > 0 &&
+    (value.h as number) > 0 &&
     (value.x as number) + (value.w as number) <= 1 &&
     (value.y as number) + (value.h as number) <= 1
   );

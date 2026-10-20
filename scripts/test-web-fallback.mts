@@ -33,6 +33,16 @@ const validAnalysis = {
 
 assert.equal(isAnalysisResponseShape(validAnalysis), true);
 
+// A well-formed annotation with positive extents that stay within the image must
+// be accepted — the degenerate/out-of-bounds rejections below are the contrast.
+assert.equal(
+  isAnalysisResponseShape({
+    ...validAnalysis,
+    annotations: [{ id: "box_1", type: "box", label: "CTA", x: 0.6, y: 0.1, w: 0.3, h: 0.2 }],
+  }),
+  true,
+);
+
 for (const malformed of [
   { ...validAnalysis, image: { width: "1200", height: 600 } },
   { ...validAnalysis, image: { width: 1200.5, height: 600 } },
@@ -54,6 +64,17 @@ for (const malformed of [
   {
     ...validAnalysis,
     annotations: [{ id: "box_1", type: "box", label: "CTA", x: 0.8, y: 0.1, w: 0.3, h: 0.2 }],
+  },
+  // A degenerate box with zero width or zero height encloses no region and would
+  // render as an invisible overlay; the API rejects w/h <= 0, so the client
+  // validator must too.
+  {
+    ...validAnalysis,
+    annotations: [{ id: "box_1", type: "box", label: "CTA", x: 0.2, y: 0.1, w: 0, h: 0.2 }],
+  },
+  {
+    ...validAnalysis,
+    annotations: [{ id: "box_1", type: "box", label: "CTA", x: 0.2, y: 0.1, w: 0.3, h: 0 }],
   },
   { ...validAnalysis, analysisId: null },
   { ...validAnalysis, analysisId: "   " },
