@@ -273,6 +273,23 @@ def test_openai_refusal_surfaces_reason(monkeypatch: MonkeyPatch) -> None:
         )
 
 
+def test_openai_top_level_error_surfaces_reason(monkeypatch: MonkeyPatch) -> None:
+    # A 200 body can still carry a top-level `error` object (e.g. the API
+    # reporting a quota or validation problem) with no output text. That
+    # message is the real cause and must reach the raised error instead of a
+    # bare "could not extract text" — the sibling of the incomplete/refusal
+    # reasons already covered above.
+    body = {"error": {"message": "Rate limit exceeded"}, "output": []}
+    request = httpx.Request("POST", "https://api.openai.com/v1/responses")
+    response = httpx.Response(200, content=json.dumps(body), request=request)
+    _patch_client(monkeypatch, _FakeClient(response))
+
+    with pytest.raises(LLMError, match=r"error: Rate limit exceeded"):
+        llm_client.call_openai_responses_api(
+            api_key="k", model="m", prompt_text="p", image=_tiny_image()
+        )
+
+
 def test_gemini_safety_finish_reason_surfaces(monkeypatch: MonkeyPatch) -> None:
     # A candidate blocked for safety has no text parts; the finishReason is the
     # actionable signal and must appear in the raised error.
