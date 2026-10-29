@@ -127,6 +127,8 @@ See [apps/api/.env.example](apps/api/.env.example). Important behavior:
 | `DEBUG` | `false` by default. Set `true` only for local debugging; detailed exception responses can expose internals. |
 | `MOCK_ANALYSIS` | `true`: deterministic + template copy only, no LLM. **`false` (default in code):** LLM path; requires `GEMINI_API_KEY` and/or `OPENAI_API_KEY`, or `POST /analyze` returns **503** with a clear error. |
 | `GEMINI_API_KEY` / `OPENAI_API_KEY` | LLM providers. Gemini is preferred when both keys are configured. |
+| `GEMINI_MODEL` / `OPENAI_MODEL` | Override the model id per provider. Defaults: `gemini-flash-latest` / `gpt-4.1-mini`. |
+| `LLM_TIMEOUT_S` | Per-request LLM HTTP timeout in seconds (positive number; default `45`). `/analyze` can make up to two calls (initial + one repair retry), so worst-case latency is ~2× this. A blank, non-numeric, or non-positive value falls back to the default. |
 | `ALLOWED_ORIGINS` | CORS allowlist; include `https://taan1el.github.io` for the hosted frontend. |
 
 ---
