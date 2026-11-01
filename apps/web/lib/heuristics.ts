@@ -235,15 +235,16 @@ async function computeMetrics(file: File): Promise<Metrics> {
   const { ratio: density, topRatio, bottomRatio } = sobelEdgeRatio(data);
   const palette = dominantPalette(data, 5);
 
-  // contrast = best contrast among the top-2 dominant colors
+  // contrast = best contrast ratio among any pair of the dominant palette
+  // colors (up to the top 5 from dominantPalette). Seed at 1 — the minimum a
+  // contrast ratio can be — and let the pair loop find the max; its first
+  // iteration (i=0, j=1) already covers the top-2 pair, so no separate priming
+  // read is needed.
   let contrast = 1;
-  if (palette.length >= 2) {
-    contrast = contrastRatio(palette[0].color, palette[1].color);
-    for (let i = 0; i < palette.length; i++) {
-      for (let j = i + 1; j < palette.length; j++) {
-        const c = contrastRatio(palette[i].color, palette[j].color);
-        if (c > contrast) contrast = c;
-      }
+  for (let i = 0; i < palette.length; i++) {
+    for (let j = i + 1; j < palette.length; j++) {
+      const c = contrastRatio(palette[i].color, palette[j].color);
+      if (c > contrast) contrast = c;
     }
   }
 
