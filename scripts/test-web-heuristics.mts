@@ -343,6 +343,38 @@ for (const [overall, tier] of [
   );
 }
 
+// Ties: when two or more categories share the minimum score, which one gets
+// named is not arbitrary — buildSummary takes `.sort(...)[0]`, and Array.sort
+// is a stable sort, so the earliest category in the CategoryScores key order
+// wins. That order is the one deriveScores emits (and CATEGORY_KEYS mirrors it),
+// so the pick is deterministic rather than engine-dependent. Pin it so a
+// reordered scores object or a switch to an unstable selection can't silently
+// start blaming a different category on every tied result.
+{
+  // An all-equal record blames the first category in canonical order.
+  const allTied = Object.fromEntries(
+    CATEGORY_KEYS.map((key) => [key, 50]),
+  ) as Record<(typeof CATEGORY_KEYS)[number], number>;
+  assert.ok(
+    buildSummary(allTied as never, 50).includes(CATEGORY_LABELS[CATEGORY_KEYS[0]]),
+    `an all-equal tie should name "${CATEGORY_LABELS[CATEGORY_KEYS[0]]}" (first in order)`,
+  );
+
+  // A two-way tie for the minimum names whichever of the two comes first.
+  for (let i = 0; i < CATEGORY_KEYS.length; i++) {
+    for (let j = i + 1; j < CATEGORY_KEYS.length; j++) {
+      const scores = Object.fromEntries(
+        CATEGORY_KEYS.map((key, idx) => [key, idx === i || idx === j ? 20 : 80]),
+      ) as Record<(typeof CATEGORY_KEYS)[number], number>;
+      const summary = buildSummary(scores as never, 60);
+      assert.ok(
+        summary.includes(CATEGORY_LABELS[CATEGORY_KEYS[i]]),
+        `tie between "${CATEGORY_KEYS[i]}" and "${CATEGORY_KEYS[j]}" should name the earlier "${CATEGORY_KEYS[i]}"`,
+      );
+    }
+  }
+}
+
 console.log("Heuristic summary-sentence invariant tests passed.");
 
 // ---------------------------------------------------------------------------
