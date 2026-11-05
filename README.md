@@ -131,6 +131,22 @@ See [apps/api/.env.example](apps/api/.env.example). Important behavior:
 | `LLM_TIMEOUT_S` | Per-request LLM HTTP timeout in seconds (positive number; default `45`). `/analyze` can make up to two calls (initial + one repair retry), so worst-case latency is ~2× this. A blank, non-numeric, or non-positive value falls back to the default. |
 | `ALLOWED_ORIGINS` | CORS allowlist; include `https://taan1el.github.io` for the hosted frontend. |
 
+### Environment variables (web)
+
+See [apps/web/.env.example](apps/web/.env.example). Only `NEXT_PUBLIC_API_URL`
+matters for the core analyze flow; the rest are optional and unlock extra pages
+that otherwise stay in a "not configured" state.
+
+| Variable | Purpose |
+|----------|---------|
+| `NEXT_PUBLIC_API_URL` | Backend origin for `POST /analyze` (no trailing slash). Blank disables the backend and runs analysis with local heuristics only. |
+| `NEXT_PUBLIC_BASE_PATH` | Subpath the static export is served under (e.g. `/AdCraft` for a GitHub Pages project path). Blank serves from the domain root. |
+| `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase project behind sign-in and per-user saved history (`/history`). When either is blank, auth is off and the app runs heuristic-only with no history. |
+| `NEXT_PUBLIC_THESYS_EMBED_URL` | Published Thesys agent embed URL for the analytics dashboard (`/dashboard`). Blank shows the one-time setup guide instead. |
+
+The hosted GitHub Pages build only needs `NEXT_PUBLIC_API_URL`; sign-in, history,
+and the dashboard are opt-in and degrade cleanly when their vars are unset.
+
 ---
 
 ## Deploy (minimal checklist)
