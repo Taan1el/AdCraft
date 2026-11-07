@@ -62,9 +62,10 @@ The backend computes grounded visual heuristics:
 - visual density
 - contrast score
 - CTA saliency score
-- internal layout balance signal
 
 These metrics provide a stable base layer and reduce generic AI output.
+(Layout balance is not measured here — it is one of the category scores the
+rule-based step below derives from these metrics.)
 
 ### 4. Rule-based analysis
 
