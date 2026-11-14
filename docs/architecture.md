@@ -67,6 +67,11 @@ These metrics provide a stable base layer and reduce generic AI output.
 (Layout balance is not measured here — it is one of the category scores the
 rule-based step below derives from these metrics.)
 
+The same pixel pass also emits the pixel-anchored **annotation boxes** — a CTA
+candidate region, the busiest region, and (only when contrast is low) a headline
+band. The pipeline pins these onto the final result verbatim, so the overlay
+stays anchored to measured pixels even after optional LLM refinement.
+
 ### 4. Rule-based analysis
 
 A deterministic scorer converts visual metrics into:
@@ -74,8 +79,10 @@ A deterministic scorer converts visual metrics into:
 - category scores
 - issues
 - recommendations
-- annotation boxes
 - summary
+
+(The annotation boxes come from the deterministic metrics step above, not from
+this scorer.)
 
 The browser-local analyzer and Worker always use deterministic analysis. The
 Starlette API also builds this deterministic base, but when
