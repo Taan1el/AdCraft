@@ -83,7 +83,7 @@ function isRecommendation(value: unknown): boolean {
   return isRecord(value) && hasNonEmptyStrings(value, ["id", "category", "priority", "title", "action"]);
 }
 
-function isAnnotation(value: unknown): boolean {
+export function isAnnotation(value: unknown): boolean {
   return (
     isRecord(value) &&
     value.type === "box" &&

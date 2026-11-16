@@ -61,9 +61,27 @@ for (const malformed of [
     ...validAnalysis,
     recommendations: [{ id: "rec_1", category: "layout", priority: "high", title: "Simplify", action: "" }],
   },
+  // A box that overflows the image on either axis (x + w > 1, or y + h > 1)
+  // points outside the rendered creative; the API clamps model output to the
+  // unit square, so the client validator rejects both overflow directions —
+  // not just the x axis.
   {
     ...validAnalysis,
     annotations: [{ id: "box_1", type: "box", label: "CTA", x: 0.8, y: 0.1, w: 0.3, h: 0.2 }],
+  },
+  {
+    ...validAnalysis,
+    annotations: [{ id: "box_1", type: "box", label: "CTA", x: 0.1, y: 0.8, w: 0.2, h: 0.3 }],
+  },
+  // A negative origin anchors the box off the top/left edge; coordinates must be
+  // in [0, 1], so a sub-zero x or y is rejected before it can offset the overlay.
+  {
+    ...validAnalysis,
+    annotations: [{ id: "box_1", type: "box", label: "CTA", x: -0.1, y: 0.1, w: 0.2, h: 0.2 }],
+  },
+  {
+    ...validAnalysis,
+    annotations: [{ id: "box_1", type: "box", label: "CTA", x: 0.1, y: -0.1, w: 0.2, h: 0.2 }],
   },
   // A degenerate box with zero width or zero height encloses no region and would
   // render as an invisible overlay; the API rejects w/h <= 0, so the client

@@ -13,6 +13,7 @@ import {
   scoreFromTarget,
   sobelEdgeRatio,
 } from "../apps/web/lib/heuristics.ts";
+import { isAnnotation } from "../apps/web/lib/analyze-fallback.ts";
 
 for (const [width, height] of [[1, 1], [1, 8], [8, 1], [2, 2], [2, 8], [8, 2]]) {
   const result = sobelEdgeRatio({
@@ -448,16 +449,16 @@ console.log("Heuristic score-mapping curve tests passed.");
 
 // buildAnnotations: the local heuristic path must emit the same kind of
 // pixel-anchored overlay boxes the remote/worker paths do, so the annotated
-// preview isn't empty offline. Every box must be a "box" within image bounds.
+// preview isn't empty offline. Each box is validated against isAnnotation —
+// the very predicate the fallback path runs on remote /analyze bodies — rather
+// than a hand-copied in-bounds check, so the local producer can never emit a
+// box its own response validator would reject (type "box", non-empty id/label,
+// positive extents inside the unit square).
 {
-  const inBounds = (a: { x: number; y: number; w: number; h: number }) =>
-    a.x >= 0 && a.y >= 0 && a.w > 0 && a.h > 0 && a.x + a.w <= 1 && a.y + a.h <= 1;
-
   // Healthy contrast (>= 4.5:1): only the CTA-region box, no low-contrast flag.
   const good = buildAnnotations({ ...baseMetrics, contrastScore: 7 } as never);
   assert.ok(good.length >= 1, "a CTA-region box is always emitted");
-  assert.ok(good.every((a) => a.type === "box"), "every annotation is a box");
-  assert.ok(good.every(inBounds), "every box stays within the image");
+  assert.ok(good.every(isAnnotation), "every box passes the response validator");
   assert.ok(
     good.some((a) => a.id === "cta-region"),
     "the CTA region is always annotated",
@@ -469,7 +470,7 @@ console.log("Heuristic score-mapping curve tests passed.");
 
   // Poor contrast (< 4.5:1): the low-contrast headline box appears too.
   const poor = buildAnnotations({ ...baseMetrics, contrastScore: 2.5 } as never);
-  assert.ok(poor.every(inBounds), "every box stays within the image");
+  assert.ok(poor.every(isAnnotation), "every box passes the response validator");
   assert.ok(
     poor.some((a) => a.id === "low-contrast"),
     "low contrast adds a headline-band box",
