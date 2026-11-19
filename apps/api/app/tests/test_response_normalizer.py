@@ -7,6 +7,7 @@ import pytest
 
 from app.services.response_normalizer import (
     InvalidModelOutput,
+    _numeric_values,
     parse_json_object,
     validate_analysis_response,
 )
@@ -83,6 +84,23 @@ def test_parse_json_object_still_unwraps_fenced_json_with_inline_backticks() -> 
     # payload is still unwrapped even when its content mentions backticks.
     fenced = '```json\n{"note": "avoid nested ` marks"}\n```'
     assert parse_json_object(fenced) == {"note": "avoid nested ` marks"}
+
+
+def test_parse_json_object_rejects_single_line_fence() -> None:
+    # A one-line "```{…}" with no newline after the opening fence has no fenced
+    # body to unwrap: the stripper returns it untouched and the leading backticks
+    # make json.loads fail loudly rather than silently mangling the payload.
+    with pytest.raises(InvalidModelOutput, match="valid JSON"):
+        parse_json_object('```{"a": 1}')
+
+
+def test_numeric_values_skips_booleans() -> None:
+    # isinstance(True, int) is True in Python, so without the explicit bool guard
+    # the finite-number scan in validate_analysis_response would treat a JSON
+    # `true`/`false` as the number 1/0. The extractor must skip bools entirely and
+    # yield only genuine numbers, so a boolean field can never be mis-read as a
+    # model-supplied metric or trip the finite check.
+    assert list(_numeric_values({"flag": True, "nested": [False, 3, {"x": 2.5}]})) == [3, 2.5]
 
 
 def _valid_response() -> dict:
