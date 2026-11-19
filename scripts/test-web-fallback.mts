@@ -33,12 +33,36 @@ const validAnalysis = {
 
 assert.equal(isAnalysisResponseShape(validAnalysis), true);
 
+// The whole reason this guard exists: a backend can answer 200 with a body that
+// is not an object at all — an empty body (null/undefined), a proxy's HTML error
+// page (a string), or a bare JSON array. `res.ok` alone would hand any of these
+// to the UI as a "successful" analysis; the top-level record guard must reject
+// them so the caller falls back to local heuristics instead.
+for (const nonRecord of [null, undefined, "<html>502 Bad Gateway</html>", 42, [], true]) {
+  assert.equal(
+    isAnalysisResponseShape(nonRecord),
+    false,
+    "a non-object remote body must never pass as an AnalysisResponse",
+  );
+}
+
 // A well-formed annotation with positive extents that stay within the image must
 // be accepted — the degenerate/out-of-bounds rejections below are the contrast.
 assert.equal(
   isAnalysisResponseShape({
     ...validAnalysis,
     annotations: [{ id: "box_1", type: "box", label: "CTA", x: 0.6, y: 0.1, w: 0.3, h: 0.2 }],
+  }),
+  true,
+);
+
+// The in-bounds check is inclusive: a box whose far edge lands exactly on the
+// image border (x + w === 1 and y + h === 1) still encloses a real region and
+// must be accepted — only true overflow (> 1, asserted below) is rejected.
+assert.equal(
+  isAnalysisResponseShape({
+    ...validAnalysis,
+    annotations: [{ id: "box_1", type: "box", label: "CTA", x: 0.7, y: 0.6, w: 0.3, h: 0.4 }],
   }),
   true,
 );
